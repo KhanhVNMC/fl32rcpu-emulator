@@ -13,4 +13,24 @@ public class Utils {
 			return u24 & 0x7FFFFF; // positive value
 		}
 	}
+
+	/**
+	 * Detect signed overflow for ADD (32-bit, 2's complement)
+	 *
+	 * Overflow can only happen if: both inputs have the same sign 
+	 * but result has the opposite sign
+	 *
+	 * this checks the sign bit (31th): (a ^ result) 
+	 * and (b ^ result). If both say yes, then overflow (add)
+	 */
+	public static boolean detectAddOverflow(int a, int b, int result) {
+		return ((a ^ result) & (b ^ result) & 0x80000000) != 0;
+	}
+	
+	/**
+	 * Same trick as the {@link Utils.detectAddOverflow}
+	 */
+	public static boolean detectSubOverflow(int a, int b, int result) {
+		return ((a ^ b) & (a ^ result) & 0x80000000) != 0;
+	}
 }

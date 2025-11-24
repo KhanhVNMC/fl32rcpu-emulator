@@ -2,11 +2,13 @@ package dev.gkvn.cpu;
 
 import static dev.gkvn.cpu.FL32RConstants.*;
 
+import java.util.Arrays;
+
 // this CPU is BIG-ENDIAN, 32-bit based
 public class FL32REmulator {
 	// the internal CPU parts, registers, flags
 	public boolean ZFL = false; // zero flag (for CMP)
-	public boolean CFL = false; // carry flag = True; if the last arithmetic (including CMP) operation is negative (negative = smaller, positive = greater)
+	public boolean NFL = false; // negative flag; if the last arithmetic (including CMP) operation is negative
 	public boolean OFL = false; // overflow flag
 	public boolean HLP = true; // true for since the kernel is loaded first anyway, must be set later if desired
 	
@@ -30,18 +32,16 @@ public class FL32REmulator {
 	// MAIN CPU LOOP
 	public void start() {
 		while (true) {
-			// fetch
+			// FETCH
 			int currentPC = this.readRegister(REG_PROGRAM_COUNTER);
+			// step to the next instruction, since execution may alter PC, this must be incremented here
+			this.writeRegister(REG_PROGRAM_COUNTER, currentPC + 4); // 4 bytes instruction
 			int instruction = this.readWordMemory(currentPC);
-			// decode
+			// DECODE
 			byte opcode = (byte)((instruction >> 24) & 0xFF); // 8 MSB
 			int operand = instruction & 0xFFFFFF;
-			// execute
+			// EXECUTE
 			execute(opcode, operand);
-			
-			// step to the next instruction
-			currentPC += 4;
-			this.writeRegister(REG_PROGRAM_COUNTER, currentPC);
 		}
 	}
 	
@@ -112,7 +112,12 @@ public class FL32REmulator {
 				writeRegister(rDest, result);
 				// set the flags
 				this.ZFL = result == 0;
-				this.CFL = (result < 0);
+				this.NFL = (result < 0);
+				if (opcode == ADD) {
+					this.OFL = Utils.detectAddOverflow(left, right, result);
+				} else if (opcode == SUB) {
+					this.OFL = Utils.detectSubOverflow(left, right, result);
+				}
 				break;
 			}
 			// bitwise operations (except not):
@@ -155,7 +160,8 @@ public class FL32REmulator {
 				// set the flags
 				if (opcode == ADDI) {
 					this.ZFL = result == 0;
-					this.CFL = (result < 0);
+					this.NFL = (result < 0);
+					this.OFL = Utils.detectAddOverflow(current, immediate, result);
 				}
 				break;
 			}
@@ -166,6 +172,16 @@ public class FL32REmulator {
 			}
 			case POP: {
 				writeRegister(rDest, popFromStack());
+				break;
+			}
+			// COMPARE (like SUB): r0 - r1
+			case CMP: {
+				int left = readRegister(rOp1), right = readRegister(rOp2);
+				int result = left - right;
+				// set the flags
+				this.ZFL = result == 0;
+				this.NFL = (result < 0);
+				this.OFL = Utils.detectSubOverflow(left, right, result);
 				break;
 			}
 			// FLOW CONTROLS (relative-to-pc jumps: RJUMP)
@@ -180,10 +196,10 @@ public class FL32REmulator {
 					case JMP -> true;
 					case JEQ -> ZFL; // a - b == 0 <-> a == b
 					case JNE -> !ZFL; // a - b != 0 <-> a != b
-					case JGT -> !CFL && !ZFL; // a - b > 0 <-> a > b
-					case JLT -> CFL; // a - b < 0 <-> a < b
-					case JGE -> !CFL || ZFL; // a >= b
-					case JLE -> CFL || ZFL; // a <= b
+					case JGT -> !NFL && !ZFL; // a - b > 0 <-> a > b
+					case JLT -> NFL; // a - b < 0 <-> a < b
+					case JGE -> !NFL || ZFL; // a >= b
+					case JLE -> NFL || ZFL; // a <= b
 					default -> false;
 				};
 				// jump to it
@@ -194,6 +210,7 @@ public class FL32REmulator {
 			}
 			// ABSOLUTE JUMPS (jump straight to address)
 			case JR: {
+				writeRegister(REG_PROGRAM_COUNTER, operand & 0xFFFFFF); // treat as unsigned 24-bit
 				break;
 			}
 			default: {
@@ -281,44 +298,43 @@ public class FL32REmulator {
 	}
 	
 	// STACK MANIPULATION
+	// STACK CONVENTION: INDUSTRY STANDARD
 	final void pushToStack(int value) {
 		// example
 		// 00 00 00 00 00 00 00 ...
 		//                   ^^ begins
 		// reserve 4 bytes for the number
-		// 00 00 00 00 00 00 00 ...
-		//       ^^ new stack head
+		// 00 00 CA FE BA BE 00 ...
+		//       ^^ new stack head, begins to write here
+		// the last byte is intentionally left blank
 		int target = readRegister(REG_STACK_POINTER) - 4; // reserve 4 bytes
-		// reserve 4 bytes for the number
-		// 00 00 00 CA FE BA BE ...
-		//          ^^ begin to write here
-		writeWordMemory(target + 1, value);
+		writeWordMemory(target, value);
 		writeRegister(REG_STACK_POINTER, target); // write the new head
 	}
 	
 	final int popFromStack() {
 		// example, current stack:
-		// 00 00 00 CA FE BA BE ...
-		//       ^^ HEAD
+		// 00 00 CA FE BA BE 00 ...
+		//       ^^ HEAD, read there
 		int target = readRegister(REG_STACK_POINTER);
-		// 00 00 00 CA FE BA BE ...
-		//          ^^ READ HERE
-		int value = readWordMemory(target + 1);
-		// 00 00 00 CA FE BA BE ...
-		//       ^^ OLD      ^^ new after POP
+		int value = readWordMemory(target);
+		// 00 00 CA FE BA BE 00 ...
+		//       ^^ OLD      ^^ new HEAD after POP
 		writeRegister(REG_STACK_POINTER, target + 4); // consume the latest value
 		return value;
 	}
 	
 	
 	public static void main(String[] args) {
-		var a = new FL32REmulator(8192);
-		for (int i = 0; i < 1_000; i++) {
+		var a = new FL32REmulator(100);
+		for (int i = 0; i < 20; i++) {
 			a.pushToStack(i);
 		}
 		
-		for (int i = 0; i < 1_000; i++) {
+		for (int i = 0; i < 20; i++) {
 			System.out.print(a.popFromStack() + " ");
 		}
+		
+		System.out.println("\n" + Arrays.toString(a.memory));
 	}
 }
