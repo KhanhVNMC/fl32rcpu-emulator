@@ -15,12 +15,195 @@ public class FL32REmulator {
 	// the CPU's memory (RAM)
 	public final byte memory[];
 	
+	// emulator
+	private double nsPerCycle;
+	
 	public FL32REmulator(int memorySize) {
 		this.memory = new byte[memorySize];
 		this.registers[REG_STACK_POINTER] = memorySize - 1;
 	}
 	
-	public void raiseFault(FaultType faultType) {
+	public void setFrequency(int hertz) {
+		this.nsPerCycle = 1_000_000_000.0 / hertz;
+	}
+	
+	// MAIN CPU LOOP
+	public void start() {
+		while (true) {
+			// fetch
+			int currentPC = this.readRegister(REG_PROGRAM_COUNTER);
+			int instruction = this.readWordMemory(currentPC);
+			// decode
+			byte opcode = (byte)((instruction >> 24) & 0xFF); // 8 MSB
+			int operand = instruction & 0xFFFFFF;
+			// execute
+			execute(opcode, operand);
+			
+			// step to the next instruction
+			currentPC += 4;
+			this.writeRegister(REG_PROGRAM_COUNTER, currentPC);
+		}
+	}
+	
+	public void execute(byte opcode, int operand) {
+		// operand could be interpreted differently
+		int rDest = (operand >> 19) & 0b11111;
+		int rOp1 = (operand >> 14) & 0b11111;
+		int rOp2 = (operand >> 9) & 0b11111;
+		
+		switch (opcode) {
+			case NOP: { break; }
+			case MOV: {
+				// simplest instruction
+				writeRegister(rDest, readRegister(rOp1));
+				break;
+			}
+			// load an immediate to the top 16 bits of a register
+			case LUI: {
+				int immediate = (operand >> 3) & 0xFFFF;
+				writeRegister(rDest, immediate << 16); // pads 16 lower bits
+				break;
+			}
+			// load a word: rDest = Memory[rOp1]...[rOp1+3]
+			case LDW: {
+				int addr = readRegister(rOp1); // fetch mem address
+				writeRegister(rDest, readWordMemory(addr));
+				break;
+			}
+			// load a byte: rDest = Memory[rOp1]
+			case LDB: {
+				int addr = readRegister(rOp1);
+				writeRegister(rDest, readByteMemory(addr));
+				break;
+			}
+			// store a word: rSrc = Memory[rMemDest...3]
+			case STW: {
+				// disambiguation
+				int rSrc = rDest, rMemDest = rOp1;
+				// value from 2nd operand
+				int value = readRegister(rSrc);
+				writeWordMemory(readRegister(rMemDest), value);
+				break;
+			}
+			// store a byte: rSrc = Memory[rMemDest]
+			case STB: {
+				// disambiguation
+				int rSrc = rDest, rMemDest = rOp1;
+				// value from 2nd operand
+				byte value = (byte)(readRegister(rSrc) & 0xFF);
+				writeByteMemory(readRegister(rMemDest), value);
+				break;
+			}
+			// arithmetic operations: rDest = rOp1 [opcode] rOp2
+			case ADD:
+			case SUB:
+			case MUL:
+			case DIV:
+			case MOD: {
+				int left = readRegister(rOp1), right = readRegister(rOp2);
+				int result = switch (opcode) {
+					case ADD -> left + right;
+					case SUB -> left - right;
+					case MUL -> left * right;
+					case DIV -> right != 0 ? (left / right) : raiseFault(FaultType.FAULT_DIVZERO);
+					case MOD -> right != 0 ? (left % right) : raiseFault(FaultType.FAULT_DIVZERO);
+					default -> raiseFault(FaultType.FAULT_ILLEGAL);
+				};
+				writeRegister(rDest, result);
+				// set the flags
+				this.ZFL = result == 0;
+				this.CFL = (result < 0);
+				break;
+			}
+			// bitwise operations (except not):
+			case AND:
+			case OR:
+			case XOR:
+			case SHL:
+			case SHR: {
+				int left = readRegister(rOp1), right = readRegister(rOp2);
+				int result = switch (opcode) {
+					case AND -> left & right;
+					case OR -> left | right;
+					case XOR -> left ^ right;
+					case SHL -> left << right;
+					case SHR -> left >>> right;
+					default -> raiseFault(FaultType.FAULT_ILLEGAL);
+				};
+				writeRegister(rDest, result);
+				break;
+			}
+			// a special bitwise one
+			case NOT: {
+				writeRegister(rDest, ~readRegister(rOp1));
+				return;
+			}
+			// immediate arithmetic & bitwise ops (special ones)
+			// rDest [ophere]= immediate
+			case ADDI:
+			case ANDI:
+			case ORI: {
+				int current = readRegister(rDest); 
+				int immediate = operand & 0x7FFFFF; 
+				int result = switch (opcode) {
+					case ADDI -> current + immediate;
+					case ANDI -> current & immediate;
+					case ORI  -> current | immediate;
+					default -> raiseFault(FaultType.FAULT_ILLEGAL);
+				};
+				writeRegister(rDest, result);
+				// set the flags
+				if (opcode == ADDI) {
+					this.ZFL = result == 0;
+					this.CFL = (result < 0);
+				}
+				break;
+			}
+			// stack operations push(rDest)
+			case PUSH: {
+				pushToStack(readRegister(rDest));
+				break;
+			}
+			case POP: {
+				writeRegister(rDest, popFromStack());
+				break;
+			}
+			// FLOW CONTROLS (relative-to-pc jumps: RJUMP)
+			case JMP: 
+			case JEQ: case JNE:
+			case JLT: case JGT:
+			case JGE: case JLE: {
+				// read the current PC
+				int absAddress = readRegister(REG_PROGRAM_COUNTER);
+				absAddress += Utils.convertU24ToInt(operand); // add the rel-jump 
+				boolean shouldJump = switch (opcode) {
+					case JMP -> true;
+					case JEQ -> ZFL; // a - b == 0 <-> a == b
+					case JNE -> !ZFL; // a - b != 0 <-> a != b
+					case JGT -> !CFL && !ZFL; // a - b > 0 <-> a > b
+					case JLT -> CFL; // a - b < 0 <-> a < b
+					case JGE -> !CFL || ZFL; // a >= b
+					case JLE -> CFL || ZFL; // a <= b
+					default -> false;
+				};
+				// jump to it
+				if (shouldJump) {
+					writeRegister(REG_PROGRAM_COUNTER, absAddress);
+				}
+				break;
+			}
+			// ABSOLUTE JUMPS (jump straight to address)
+			case JR: {
+				break;
+			}
+			default: {
+				this.raiseFault(FaultType.FAULT_ILLEGAL);
+				break;
+			}
+		}
+	}
+	
+	public int raiseFault(FaultType faultType) {
 		// TODO temporary
 		throw new RuntimeException("[FAULT] CPU HALTED! Fault: " + faultType
 			+ ". VMEM OFFSET: " + this.registers[REG_VMEM_OFFSET]
@@ -126,6 +309,7 @@ public class FL32REmulator {
 		writeRegister(REG_STACK_POINTER, target + 4); // consume the latest value
 		return value;
 	}
+	
 	
 	public static void main(String[] args) {
 		var a = new FL32REmulator(8192);
