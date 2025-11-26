@@ -23,13 +23,16 @@ public class FL32REmulator implements GenericCPUEmulator {
 	private final ByteMemory memory;
 	private final ReadOnlyByteMemory readonlyMemory;
 	
+	// cpu internal states
+	private boolean cpuHalted = false;
+	
 	// emulator parameter/controls
 	private double nsPerCycle;
 	private int frequencyHz;
-	private boolean cpuHalted = false;
 	private boolean cpuKilled = false;
 	private boolean cpuStarted = false;
 	private boolean bootProgramLoaded = false;
+	private boolean singleStepMode = false;
 	
 	public FL32REmulator(long memorySize) {
 		// clamp memorySize to 32-bit unsigned max
@@ -60,10 +63,12 @@ public class FL32REmulator implements GenericCPUEmulator {
 	@Override
 	public void loadBootProgram(byte[] program) {
 		if (bootProgramLoaded) {
-			throw new IllegalStateException("write msg for me");
+			throw new IllegalStateException("Boot program has already been loaded; cannot load twice!");
 		}
 		if (program.length > memory.length()) {
-			throw new IllegalArgumentException("write msg for me");
+			throw new IllegalArgumentException(
+				"Boot program size (" + program.length + " bytes) exceeds available memory (" + memory.length() + " bytes)!"
+			);
 		}
 		// copy over the program to memory (0x0)
 		for (int i = 0; i < program.length; i++) {
@@ -79,45 +84,149 @@ public class FL32REmulator implements GenericCPUEmulator {
 	// MAIN CPU LOOP
 	@Override
 	public void start() {
+		if (this.cpuStarted) {
+			throw new IllegalStateException("CPU has already been started; cannot start twice!");
+		}
+		this.cpuStarted = true;
 		while (true) {
 			if (this.cpuKilled) break; // stop the cpu immediately (basically powered off)
-			if (this.cpuHalted) continue; // spin wait until the CPU is interrupted
-			try {
-				// ===== FETCH =====
-				int currentPC = this.readRegister(REG_PROGRAM_COUNTER);
-				int instruction = this.readWordMemory(currentPC);
-				// step to the next instruction, since execution may alter PC, this must be incremented here
-				this.writeRegister(REG_PROGRAM_COUNTER, currentPC + 4); // 4 bytes (32bit) instruction
-				// ===== DECODE =====
-				byte opcode = (byte) ((instruction >> 24) & 0xFF); // 8 MSB
-				int operand = instruction & 0xFFFFFF;
-				// ===== EXECUTE =====
-				long execStart = System.nanoTime();
-				execute(opcode, operand);
-				// LIMIT CPU FREQ FIRST (without this the CPU would run at extreme speed)
-				// compensate for the time that it takes to actually execute the instruction in the JVM
-				if (nsPerCycle > 0) {
-					long jvmExecTime = System.nanoTime() - execStart;
-					long emulatedExecTime = (long)(FL32RCycleTable.COST_TABLE[opcode] * nsPerCycle);
-					long waitForNs = Math.max(0, emulatedExecTime - jvmExecTime);
-					if (waitForNs > 0) {
-						long spinUntil = System.nanoTime() + waitForNs;
-						while (System.nanoTime() < spinUntil) {} // spin wait
-					}
-				}
-			} catch (FaultRaisedException ignored) {}
+			if (this.singleStepMode || this.cpuHalted) {
+				Thread.onSpinWait(); // basically skip autonomous execution
+				continue;
+			}
+			// normal execution
+			this.stepNextInstruction();
 		}
 	}
 	
+	@Override
+	public boolean isStarted() {
+		return this.cpuStarted;
+	}
+	
+	@Override
+	public boolean isAutonomousExecutionEnabled() {
+		return isCPUAvailable() && !singleStepMode && !cpuHalted;
+	}
+	
+	@Override
+	public void activateSingleStepMode() {
+		if (!this.isCPUAvailable()) {
+			throw new IllegalStateException("CPU not available!");
+		}
+		if (this.singleStepMode) {
+			throw new IllegalStateException("Single step mode is already activated!");
+		}
+		this.singleStepMode = true;
+		this.halt(); // halt initially
+	}
+	
+	@Override
+	public void stepExecution() {
+		if (!this.isCPUAvailable()) {
+			throw new IllegalStateException("CPU not available!");
+		}
+		if (!this.singleStepMode) {
+			throw new IllegalStateException("Single step mode is not activated!");
+		}
+		this.resume(); // the halted flag may be used in the future, so do this sequence
+		this.stepNextInstruction();
+		this.halt(); // halt so it wont overrun (doesnt matter)
+	}
+	
+	@Override
+	public void deactivateSingleStepMode() {
+		if (!this.isCPUAvailable()) {
+			throw new IllegalStateException("CPU not available!");
+		}
+		if (!this.singleStepMode) {
+			throw new IllegalStateException("Single step mode is not activated!");
+		}
+		this.singleStepMode = false;
+		this.resume(); // resume the CPU regardless
+	}
+	
+	@Override
+	public boolean isOnSingleStepMode() {
+		return this.singleStepMode;
+	}
+	
+	/**
+	 * Does what it says, a full cycle of FETCH -> DECODE -> EXECUTE and simulate
+	 * real hardware speed with spin wait.
+	 */
+	private synchronized final void stepNextInstruction() {
+		try {
+			// ===== FETCH =====
+			int currentPC = this.readRegister(REG_PROGRAM_COUNTER);
+			int instruction = this.readWordMemory(currentPC);
+			// step to the next instruction, since execution may alter PC, this must be incremented here
+			this.writeRegister(REG_PROGRAM_COUNTER, currentPC + 4); // 4 bytes (32bit) instruction
+			// ===== DECODE =====
+			byte opcode = (byte) ((instruction >> 24) & 0xFF); // 8 MSB
+			int operand = instruction & 0xFFFFFF;
+			// ===== EXECUTE =====
+			long execStart = System.nanoTime();
+			System.out.println("INSTRUCTION: " + String.format("%32s", Integer.toBinaryString(instruction)).replace(' ', '0'));
+			System.out.println("OPCODE: " + String.format("%8s", Integer.toBinaryString(opcode)).replace(' ', '0'));
+			System.out.println("OPERAND: " + String.format("%24s", Integer.toBinaryString(operand)).replace(' ', '0') + "\n");
+
+			execute(opcode, operand);
+			// LIMIT CPU FREQ FIRST (without this the CPU would run at extreme speed)
+			// compensate for the time that it takes to actually execute the instruction in the JVM
+			if (nsPerCycle > 0) {
+				long jvmExecTime = System.nanoTime() - execStart;
+				long emulatedExecTime = (long)(FL32RCycleTable.COST_TABLE[opcode] * nsPerCycle);
+				long waitForNs = Math.max(0, emulatedExecTime - jvmExecTime);
+				if (waitForNs > 0) {
+					long spinUntil = System.nanoTime() + waitForNs;
+					while (System.nanoTime() < spinUntil) {} // spin wait
+				}
+			}
+		} catch (FaultRaisedException ignored) {}
+	}
+ 	
 	@Override
 	public void halt() {
 		this.cpuHalted = true;
 	}
 	
 	@Override
+	public void resume() {
+		this.cpuHalted = false;
+	}
+	
+	@Override
+	public void reset() {
+		if (!this.isCPUAvailable()) {
+			throw new IllegalStateException("CPU not available!");
+		}
+		// reset all registers and flags
+		this.singleStepMode = false;
+		Arrays.fill(this.registers, 0x00);
+		this.ZFL = false;
+		this.NFL = false;
+		this.OFL = false;
+		this.HLP = true; // start in the highest level privilege
+		// jump to the post-reset vector, 0x0 for now
+		writeRegister(REG_PROGRAM_COUNTER, 0x0); // reset vector (0x0 for now)
+		// put the stack pointer to the initial position
+		writeRegister(REG_STACK_POINTER, (int)((memory.length() - 1) & 0xFFFFFFFFL));
+		this.resume();
+	}
+	
+	@Override
 	public void kill() {
+		if (!this.isCPUAvailable()) {
+			throw new IllegalStateException("CPU not available!");
+		}
 		this.halt();
 		this.cpuKilled = true;
+	}
+	
+	@Override
+	public boolean isKilled() {
+		return this.cpuKilled;
 	}
 	
 	@Override
@@ -229,13 +338,13 @@ public class FL32REmulator implements GenericCPUEmulator {
 				break;
 			}
 			// immediate arithmetic & bitwise ops (special ones)
-			// rDest [ophere]= immediate
+			// rDest [ophere]= immediate (19 bits lsb)
 			case ADDI:
 			case ANDI:
 			case XORI:
 			case ORI: {
 				int current = readRegister(rDest); 
-				int immediate = operand & 0x7FFFFF; 
+				int immediate = operand & ((1 << 19) - 1);
 				int result = switch (opcode) {
 					case ADDI -> current + immediate;
 					case ANDI -> current & immediate;
@@ -379,7 +488,7 @@ public class FL32REmulator implements GenericCPUEmulator {
 		// halt the CPU and may be in the future, 
 		// jump to a vector table and escalate back to HLP
 		this.halt();
-		System.out.println(faultType);
+		System.out.println("CPU AT FAULT:" + faultType + " PC: " + readRegister(REG_PROGRAM_COUNTER));
 		// TODO
 		throw new FaultRaisedException(); // interrupts current execute()
 	}
@@ -537,11 +646,5 @@ public class FL32REmulator implements GenericCPUEmulator {
 		//       ^^ OLD      ^^ new HEAD after POP
 		writeRegister(REG_STACK_POINTER, target + 4); // consume the latest value
 		return value;
-	}
-	
-	public static void main(String[] args) {
-		var a = new FL32REmulator(1024);
-		a.setFrequencyHz(1000);
-		a.start();
 	}
 }
