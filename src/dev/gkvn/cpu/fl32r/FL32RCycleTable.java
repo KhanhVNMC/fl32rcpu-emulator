@@ -1,6 +1,6 @@
-package dev.gkvn.cpu;
+package dev.gkvn.cpu.fl32r;
 
-import static dev.gkvn.cpu.FL32RConstants.*;
+import static dev.gkvn.cpu.fl32r.FL32RConstants.*;
 
 public class FL32RCycleTable {
 	// approximate cycles per instruction for FL32RCPU
@@ -37,6 +37,7 @@ public class FL32RCycleTable {
 		COST_TABLE[ADDI] = 1;
 		COST_TABLE[ORI] = 1;
 		COST_TABLE[ANDI] = 1;
+		COST_TABLE[XORI] = 1;
 		
 		// STACK
 		COST_TABLE[PUSH] = 3; // stack write
@@ -52,14 +53,18 @@ public class FL32RCycleTable {
 		COST_TABLE[JGT] = 2;
 		COST_TABLE[JLE] = 2;
 		COST_TABLE[JGE] = 2;
+		COST_TABLE[JOF] = 2;
+		COST_TABLE[JNO] = 2;
+		COST_TABLE[CLR] = 5; // register + jump
 		COST_TABLE[CALL] = 5; // stack + jump
 		COST_TABLE[RET] = 5; // pop + jump
 
-		// VMEM privileged
+		// VMEM/privileged
 		COST_TABLE[VMO] = 1;
 		COST_TABLE[VMB] = 1;
+		COST_TABLE[HLR] = 3; // set flag + jump
 
-		// NOP
+		// SPECIALS
 		COST_TABLE[NOP] = 1;
 	}
 }

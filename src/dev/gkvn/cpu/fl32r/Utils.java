@@ -1,4 +1,4 @@
-package dev.gkvn.cpu;
+package dev.gkvn.cpu.fl32r;
 
 public class Utils {
 	public static final int beBytesToInt(byte b0, byte b1, byte b2, byte b3) {

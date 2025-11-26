@@ -1,4 +1,4 @@
-package dev.gkvn.cpu;
+package dev.gkvn.cpu.fl32r;
 
 public class FL32RConstants {
 	// a word is 32-bit
@@ -26,7 +26,8 @@ public class FL32RConstants {
 		// immediate
 		ADDI = 0x1B,
 		ORI  = 0x1C,
-		ANDI = 0x1D,
+		XORI = 0x1D,
+		ANDI = 0x1E,
 		
 		// STACK CONTROLS
 		PUSH = 0x20,
@@ -35,17 +36,20 @@ public class FL32RConstants {
 		// FLOW CONTROLS
 		JMP  = 0x30, // [RJUMP = Relative Jump] jump to an offset relative to PC (set RPC)
 		JR   = 0x31, // JUMP to an address in rAddr
-		CMP  = 0x32, // COMPARE rOp1,rOp2; sets flags: ZFL (zero) and CFL (less-than)
+		CMP  = 0x32, // COMPARE rOp1,rOp2; sets flags: ZFL (zero) and NFL (less-than)
 		JEQ  = 0x33, // IF EQUAL then RJUMP (ZFL = TRUE)
 		JNE  = 0x34, // IF NOT EQUAL then RJUMP (ZFL = FALSE)
-		JLT  = 0x35, // IF LESS THAN then RJUMP (CFL = TRUE)
-		JGT  = 0x36, // IF GREATER THAN then RJUMP (CFL = FALSE)
-		JLE  = 0x37, // IF LESS OR EQ then RJUMP (CFL = TRUE, ZFL = TRUE)
-		JGE  = 0x38, // IF GREATER OR EQ then RJUMP (CFL = FALSE, ZFL = TRUE)
-		CALL = 0x39, // CALL a function (return address PUSH into stack)
-		RET  = 0x3A, // RETURN by popping the stack and JUMP there
+		JLT  = 0x35, // IF LESS THAN then RJUMP (NFL = TRUE)
+		JGT  = 0x36, // IF GREATER THAN then RJUMP (NFL = FALSE)
+		JLE  = 0x37, // IF LESS OR EQ then RJUMP (NFL = TRUE, ZFL = TRUE)
+		JGE  = 0x38, // IF GREATER OR EQ then RJUMP (NFL = FALSE, ZFL = TRUE)
+		JOF  = 0x39, // IF SIGNED ARITHMETIC OVERFLOW then RJUMP (OFL = TRUE)
+		JNO  = 0x3A, // IF SIGNED ARITHMETIC NOT OVERFLOW then RJUMP (OFL = FALSE)
+		CALL = 0x3B, // CALL a function (RJUMP) (return address PUSH into stack)
+		CLR  = 0x3C, // CALL a function from an address in register (rAddr, like JR)
+		RET  = 0x3D, // RETURN by popping the stack and JUMP ABSOLUTE there
 		
-		// MEMORY MANAGEMENT (privileged)
+		// MEMORY MANAGEMENT/CPU STATE (privileged instructions starts with 0x5)
 		/*
 		 * Virtual Memory (VMEM) — Brief Documentation
 		 *
@@ -63,7 +67,10 @@ public class FL32RConstants {
 		VMB  = 0x51, // set Virtual Memory max bound (set to 0 for FULL ACCESS)
 		
 		// SPECIALS
-		NOP  = 0x00 // no-op
+		HLR  = 0x52, // de-escalation, clear HLR and return to the address on the register
+		NOP  = 0x00, // no-op
+		HLT  = 0x7A, // halt the cpu
+		KILL = 0x7B // kill the cpu and print debug (EMU ONLY), like HLT on FL516, on real HW, this is NO-OP
 	;
 	
 	public static final int // SPECIAL REGISTERS INDEX

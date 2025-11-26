@@ -1,4 +1,4 @@
-package dev.gkvn.cpu;
+package dev.gkvn.cpu.fl32r;
 
 public enum FaultType {
 	FAULT_MEM, 
