@@ -10,7 +10,11 @@ public class Test {
 		FL32REmulator emu = new FL32REmulator(1024);
 		emu.setFrequencyHz(-1);
 		
-		int[] text = new int[] { 
+		int[] text = new int[] {
+			// LUI    R5, 0xABCD ; 16-bit upper bits
+			(LUI << 24) | (1 << 19) | (0xff << 3),
+			(MOV << 24) | (1 << 19) | (REG_ZERO << 14),
+			(ORI << 24) | (1 << 19) | 5,
 			// ADDI   R1, 10
 			(ADDI << 24) | ((1 << 19) | 10), // I-type [opcode 0..7][reg 8...12][13...31]
 			// ADDI   R1, 20
@@ -36,6 +40,9 @@ public class Test {
 		}
 		emu.loadBootProgram(boot);
 		emu.start();
-		System.out.println(Arrays.toString(emu.dumpRegisters()));
+		int reg[] = emu.dumpRegisters();
+		for (int i = 0; i < reg.length; i++) {
+			System.out.println("R" + i + ": " + Integer.toUnsignedLong(reg[i]));
+		}
 	}
 }
