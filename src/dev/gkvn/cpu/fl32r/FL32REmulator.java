@@ -275,20 +275,20 @@ public class FL32REmulator implements GenericCPUEmulator {
 				writeRegister(rDest, readByteMemory(addr));
 				break;
 			}
-			// store a word: rSrc = Memory[rMemDest...3]
+			// store a word: Memory[rMemDest...3] = rSrc
 			case STW: {
-				// disambiguation
-				int rSrc = rDest, rMemDest = rOp1;
-				// value from 2nd operand
+				// disambiguation (rDest is ignored for STO)
+				int rSrc = rOp1, rMemDest = rOp2;
+				// value from 3rd operand
 				int value = readRegister(rSrc);
 				writeWordMemory(readRegister(rMemDest), value);
 				break;
 			}
-			// store a byte: rSrc = Memory[rMemDest]
+			// store a byte: Memory[rMemDest] = rSrc
 			case STB: {
-				// disambiguation
-				int rSrc = rDest, rMemDest = rOp1;
-				// value from 2nd operand
+				// disambiguation (rDest is ignored for STO)
+				int rSrc = rOp1, rMemDest = rOp2;
+				// value from 3rd operand
 				byte value = (byte)(readRegister(rSrc) & 0xFF);
 				writeByteMemory(readRegister(rMemDest), value);
 				break;

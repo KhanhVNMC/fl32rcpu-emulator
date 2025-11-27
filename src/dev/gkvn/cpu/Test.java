@@ -12,11 +12,11 @@ public class Test {
 		
 		int[] text = new int[] {
 			// LUI    R5, 0xABCD ; 16-bit upper bits
-			(LUI << 24) | (1 << 19) | (0xff << 3),
+			(LUI << 24) | (1 << 19) | (0xff << 3), // I-type 2 [opcode 0...7][reg 8...12][imm (16) 13...28]
 			(MOV << 24) | (1 << 19) | (REG_ZERO << 14),
 			(ORI << 24) | (1 << 19) | 5,
 			// ADDI   R1, 10
-			(ADDI << 24) | ((1 << 19) | 10), // I-type [opcode 0..7][reg 8...12][13...31]
+			(ADDI << 24) | ((1 << 19) | 10), // I-type [opcode 0..7][reg 8...12][imm (19) 13...31]
 			// ADDI   R1, 20
  			(ADDI << 24) | ((1 << 19) | 20),
  			// MOV    R0, R1
@@ -28,7 +28,10 @@ public class Test {
  			// POP   R3
 			(POP << 24) | (3 << 19), 
 			(PUSH << 24) | (3 << 19), 
-			(KILL << 24) 
+			(JMP << 24) | 4, // J-type [opcode 0..7][immediate 8...31]
+			(KILL << 24), 
+			(ADDI << 24) | (8 << 19) | 36,
+			(KILL << 24),
 		};
 		
 		byte[] boot = new byte[text.length * 4];
