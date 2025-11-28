@@ -37,15 +37,28 @@ public interface GenericCPUEmulator {
 	void loadBootProgram(byte[] program);
 
 	/**
-	 * Starts autonomous CPU execution.
-	 * 
-	 * This method blocks and runs the main fetch/decode/execute loop until: -
-	 * {@link #kill()} is called, - or the host thread terminates.
-	 * 
+	 * Starts CPU execution on the current thread.
+	 *
+	 * The CPU enters its main FETCH/DECODE/EXECUTE loop and will continue running
+	 * until {@link #kill()} is called or the host thread terminates.
+	 *
+	 * <p><b>Important notes:</b>
+	 * <ul>
+	 * 	 <li>Execution occurs on the <b>current thread</b> that calls this method.</li>
+	 * 	 <li>If {@code startInSingleStepMode} is true, the CPU starts in single-step
+	 *       mode: autonomous execution is disabled and instructions execute only when
+	 *       {@link #stepExecution()} is invoked.
+	 *   </li>
+	 *   <li>If {@code startInSingleStepMode} is false, the CPU executes instructions autonomously.</li>
+	 * </ul>
+	 *
+	 * @param startInSingleStepMode If true, CPU starts in single-step mode;
+	 *                              otherwise, autonomous execution begins
+	 *                              immediately.
 	 * @throws IllegalStateException if the CPU has already been started.
 	 */
-	void start();
-
+	void start(boolean startInSingleStepMode);
+	
 	/**
 	 * Halts the CPU.
 	 * 
@@ -54,7 +67,7 @@ public interface GenericCPUEmulator {
 	 * {@link #resume()} or via single-step debugging.
 	 */
 	void halt();
-
+	
 	/**
 	 * Resumes a halted CPU.
 	 * 
@@ -67,10 +80,17 @@ public interface GenericCPUEmulator {
 	 *
 	 * Resets registers, flags, and internal state to their post-boot values. Memory
 	 * contents are preserved.
-	 * 
+	 *
+	 * <p><b>Important notes!</b>
+	 * <ul>
+	 *    <li>If {@code resetToSingleStepMode} is true, the CPU enters single-step mode after reset.</li>
+	 *    <li>If false, the CPU resumes autonomous execution after reset (if it was previously started).</li>
+	 * </ul>
+	 *
+	 * @param resetToSingleStepMode Whether the CPU should start in single-step mode after reset.
 	 * @throws IllegalStateException if the CPU has been permanently killed.
 	 */
-	void reset();
+	void reset(boolean resetToInSingleStepMode);
 
 	/**
 	 * Permanently stops the CPU.
@@ -99,8 +119,12 @@ public interface GenericCPUEmulator {
 
 	/**
 	 * Executes exactly one instruction.
-	 * 
+	 *
 	 * Requires single-step mode to be active.
+	 *
+	 * <p><b>Important note:</b> Execution may freeze the calling thread to simulate
+	 * real CPU timing if the emulated frequency is low. This allows instruction
+	 * execution to respect the configured clock rate.
 	 *
 	 * @throws IllegalStateException if single-step mode is not enabled.
 	 */

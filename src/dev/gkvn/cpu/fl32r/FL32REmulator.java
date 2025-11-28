@@ -83,11 +83,16 @@ public class FL32REmulator implements GenericCPUEmulator {
 	
 	// MAIN CPU LOOP
 	@Override
-	public void start() {
+	public void start(boolean startInSingleStepMode) {
 		if (this.cpuStarted) {
 			throw new IllegalStateException("CPU has already been started; cannot start twice!");
 		}
 		this.cpuStarted = true;
+		// start the cpu halted and in single step mode, needs manual stepping
+		if (startInSingleStepMode && !this.singleStepMode) {
+			this.activateSingleStepMode();
+		}
+		// autonomous execution
 		while (true) {
 			if (this.cpuKilled) break; // stop the cpu immediately (basically powered off)
 			if (this.singleStepMode || this.cpuHalted) {
@@ -122,7 +127,7 @@ public class FL32REmulator implements GenericCPUEmulator {
 	}
 	
 	@Override
-	public void stepExecution() {
+	public synchronized void stepExecution() {
 		if (!this.isCPUAvailable()) {
 			throw new IllegalStateException("CPU not available!");
 		}
@@ -197,7 +202,7 @@ public class FL32REmulator implements GenericCPUEmulator {
 	}
 	
 	@Override
-	public void reset() {
+	public void reset(boolean resetToSingleStepMode) {
 		if (!this.isCPUAvailable()) {
 			throw new IllegalStateException("CPU not available!");
 		}
@@ -212,6 +217,10 @@ public class FL32REmulator implements GenericCPUEmulator {
 		writeRegister(REG_PROGRAM_COUNTER, 0x0); // reset vector (0x0 for now)
 		// put the stack pointer to the initial position
 		writeRegister(REG_STACK_POINTER, (int)((memory.length() - 1) & 0xFFFFFFFFL));
+		if (resetToSingleStepMode) {
+			this.activateSingleStepMode();
+			return;
+		}
 		this.resume();
 	}
 	
