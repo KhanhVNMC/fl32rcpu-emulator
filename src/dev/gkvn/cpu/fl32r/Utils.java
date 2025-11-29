@@ -13,6 +13,14 @@ public class Utils {
 			return u24 & 0x7FFFFF; // positive value
 		}
 	}
+	
+	public static final int convertIntToU24(int number) {
+		if (number < 0) {
+			return 0x800000 | (-number & 0x7FFFFF);
+		} else {
+			return number & 0x7FFFFF;
+		}
+	}
 
 	/**
 	 * Detect signed overflow for ADD (32-bit, 2's complement)

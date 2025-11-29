@@ -6,7 +6,7 @@ import static dev.gkvn.cpu.fl32r.FL32RHelper.*;
 
 import java.util.Arrays;
 
-public class Test {
+public class Test implements Cloneable {
 	public static void main(String[] args) {
 		FL32REmulator emu = new FL32REmulator(1024);
 		emu.setFrequencyHz(-1);
@@ -50,7 +50,8 @@ public class Test {
 			boot[i * 4 + 3] = (byte) (text[i] & 0xFF);
 		}
 		emu.loadBootProgram(boot);
-		emu.start(true);
+		emu.start(false);
+		emu.dumpMemory();
 		int reg[] = emu.dumpRegisters();
 		for (int i = 0; i < reg.length; i++) {
 			System.out.println("R" + i + ": 0x" + Integer.toHexString(reg[i]) + " | " + Integer.toUnsignedLong(reg[i]));

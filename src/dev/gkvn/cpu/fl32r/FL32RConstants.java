@@ -51,7 +51,7 @@ public class FL32RConstants {
 		
 		// MEMORY MANAGEMENT/CPU STATE (privileged instructions starts with 0x5)
 		/*
-		 * Virtual Memory (VMEM) — Brief Documentation
+		 * Virtual Memory (VMEM) - Brief Documentation
 		 *
 		 * These instructions are only available to HLP (Host-Level Privilege) entities.
 		 * When VMEM is enabled, all subsequent memory accesses (load, store, stack,

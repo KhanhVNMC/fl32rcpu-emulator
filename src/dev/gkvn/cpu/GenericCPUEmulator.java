@@ -136,7 +136,42 @@ public interface GenericCPUEmulator {
 	 * @throws IllegalStateException if single-step mode is not enabled.
 	 */
 	void deactivateSingleStepMode();
+	
+	/**
+	 * Adds a breakpoint at the specified virtual address.
+	 * <p>
+	 * A virtual breakpoint triggers when the program counter (PC) reaches the given
+	 * virtual address after address translation.
+	 *
+	 * @param virtualAddress the virtual address at which execution will pause
+	 */
+	void addBreakpoint(long virtualAddress);
 
+	/**
+	 * Removes the breakpoint set at the specified virtual address.
+	 * 
+	 * @param virtualAddress
+	 */
+	void removeBreakpoint(long virtualAddress);
+
+	/**
+	 * Adds a breakpoint at the specified physical memory address.
+	 * <p>
+	 * Physical breakpoints trigger when the CPU fetches an instruction located at
+	 * the corresponding physical address.
+	 *
+	 * @param physicalAddress the physical address at which execution will pause
+	 */
+	void addBreakpointPhysical(long physicalAddresss);
+
+	/**
+	 * Removes the breakpoint set at the specified physical address.
+	 *
+	 * @param physicalAddress the physical address whose breakpoint should be
+	 *                        removed
+	 */
+	void removeBreakpointPhysical(long physicalAddresss);
+	
 	// === STATE INSPECTION ===
 
 	/**

@@ -3,6 +3,9 @@ package dev.gkvn.cpu.fl32r;
 import static dev.gkvn.cpu.fl32r.FL32RConstants.*;
 
 import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Random;
+import java.util.Set;
 
 import dev.gkvn.cpu.ByteMemory;
 import dev.gkvn.cpu.GenericCPUEmulator;
@@ -33,6 +36,8 @@ public class FL32REmulator implements GenericCPUEmulator {
 	private boolean cpuStarted = false;
 	private boolean bootProgramLoaded = false;
 	private boolean singleStepMode = false;
+	private Set<Long> breakpointsVirtual = new HashSet<>();
+	private Set<Long> breakpointsPhysical = new HashSet<>();
 	
 	public FL32REmulator(long memorySize) {
 		// clamp memorySize to 32-bit unsigned max
@@ -75,10 +80,18 @@ public class FL32REmulator implements GenericCPUEmulator {
 			memory.set(i, program[i]);
 		}
 		// setup the boot process
+		Arrays.fill(this.registers, 0x00); // fill regs with default values
 		this.HLP = true; // always start at the highest privilege level
 		writeRegister(REG_PROGRAM_COUNTER, 0x0);
 		writeRegister(REG_STACK_POINTER, (int)((memory.length() - 1) & 0xFFFFFFFFL));
 		this.bootProgramLoaded = true;
+	}
+	
+	Random r = new Random();
+	public void randomize(int startAt) {
+		for (int i = startAt; i < memory.length(); i++) {
+			memory.set(i, (byte) (r.nextInt(0, 255) & 0xFF));
+		}
 	}
 	
 	// MAIN CPU LOOP
@@ -165,6 +178,11 @@ public class FL32REmulator implements GenericCPUEmulator {
 			// ===== FETCH =====
 			int currentPC = this.readRegister(REG_PROGRAM_COUNTER);
 			int instruction = this.readWordMemory(currentPC);
+			boolean breakPointHit = this.isAtBreakpoint(currentPC);
+			if (breakPointHit && !this.isOnSingleStepMode()) {
+				this.activateSingleStepMode();
+				return;
+			}
 			// step to the next instruction, since execution may alter PC, this must be incremented here
 			this.writeRegister(REG_PROGRAM_COUNTER, currentPC + 4); // 4 bytes (32bit) instruction
 			// ===== DECODE =====
@@ -172,9 +190,9 @@ public class FL32REmulator implements GenericCPUEmulator {
 			int operand = instruction & 0xFFFFFF;
 			// ===== EXECUTE =====
 			long execStart = System.nanoTime();
-			System.out.println("INSTRUCTION: " + String.format("%32s", Integer.toBinaryString(instruction)).replace(' ', '0'));
-			System.out.println("OPCODE: " + String.format("%8s", Integer.toBinaryString(opcode)).replace(' ', '0'));
-			System.out.println("OPERAND: " + String.format("%24s", Integer.toBinaryString(operand)).replace(' ', '0') + "\n");
+//			System.out.println("INSTRUCTION: " + String.format("%32s", Integer.toBinaryString(instruction)).replace(' ', '0'));
+//			System.out.println("OPCODE: " + String.format("%8s", Integer.toBinaryString(opcode)).replace(' ', '0'));
+//			System.out.println("OPERAND: " + String.format("%24s", Integer.toBinaryString(operand)).replace(' ', '0') + "\n");
 
 			execute(opcode, operand);
 			// LIMIT CPU FREQ FIRST (without this the CPU would run at extreme speed)
@@ -189,6 +207,24 @@ public class FL32REmulator implements GenericCPUEmulator {
 				}
 			}
 		} catch (FaultRaisedException ignored) {}
+	}
+	
+	/**
+	 * Determines whether the current program counter (PC) matches ANY active breakpoint,
+	 * either virtual or physical. This method is called after FETCH.
+	 *
+	 * @param currentVirtualPC the program counter value before executing the current instruction,
+               interpreted as a 32-bit uint virtual address
+	 * @return {@code true} if an enabled breakpoint exists at the current PC,
+	 *         {@code false} otherwise
+	 */
+	public boolean isAtBreakpoint(int currentVirtualPC) {
+		if (breakpointsVirtual.size() == 0 && breakpointsPhysical.size() == 0) {
+			return false;
+		}
+		long virtualAddress = Integer.toUnsignedLong(currentVirtualPC);
+		long physicalAddress = virtualToPhysicalAddress(currentVirtualPC);
+		return breakpointsVirtual.contains(virtualAddress) || breakpointsPhysical.contains(physicalAddress);
 	}
  	
 	@Override
@@ -231,6 +267,26 @@ public class FL32REmulator implements GenericCPUEmulator {
 		}
 		this.halt();
 		this.cpuKilled = true;
+	}
+	
+	@Override
+	public void addBreakpoint(long virtualAddress) {
+		breakpointsVirtual.add(virtualAddress);
+	}
+	
+	@Override
+	public void removeBreakpoint(long virtualAddress) {
+		breakpointsVirtual.remove(virtualAddress);
+	}
+	
+	@Override
+	public void addBreakpointPhysical(long physicalAddresss) {
+		breakpointsPhysical.add(physicalAddresss);
+	}
+	
+	@Override
+	public void removeBreakpointPhysical(long physicalAddresss) {
+		breakpointsPhysical.remove(physicalAddresss);
 	}
 	
 	@Override
@@ -448,7 +504,7 @@ public class FL32REmulator implements GenericCPUEmulator {
 				// example:
 				// LDI  HR0, 0xCAFEBABE
 				// VMO  HR0
-				// XOR  HRO, HRO, HRO ; for safety
+				// XOR  HR0, HR0, HR0 ; for safety
 				writeRegister(REG_VMEM_OFFSET, readRegister(rDest));
 				break;
 			}
@@ -497,7 +553,7 @@ public class FL32REmulator implements GenericCPUEmulator {
 		// halt the CPU and may be in the future, 
 		// jump to a vector table and escalate back to HLP
 		this.halt();
-		System.out.println("CPU AT FAULT:" + faultType + " PC: " + readRegister(REG_PROGRAM_COUNTER));
+		System.out.println("CPU AT FAULT:" + faultType + " PC: " + Integer.toUnsignedString(readRegister(REG_PROGRAM_COUNTER)));
 		// TODO
 		throw new FaultRaisedException(); // interrupts current execute()
 	}
@@ -554,7 +610,9 @@ public class FL32REmulator implements GenericCPUEmulator {
 	 * @return the computed 32-bit physical address as a long
 	 */
 	final long virtualToPhysicalAddress(int virtualAddress) {
-		return (this.registers[REG_VMEM_OFFSET] + Integer.toUnsignedLong(virtualAddress)) & 0xFFFFFFFF;
+		return (Integer.toUnsignedLong(this.registers[REG_VMEM_OFFSET]) 
+			+ Integer.toUnsignedLong(virtualAddress)
+		) & 0xFFFFFFFF;
 	}
 	
 	/**
