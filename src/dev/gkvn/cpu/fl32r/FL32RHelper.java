@@ -21,7 +21,7 @@ public class FL32RHelper {
 	}
 
 	/**
-	 * R-TYPE instruction encoder (register–register).
+	 * R-TYPE instruction encoder (registerï¿½register).
 	 *
 	 * Format: [ opcode:8 | rd:5 | rs1:5 | rs2:5 | unused:9 ]
 	 *
@@ -51,7 +51,7 @@ public class FL32RHelper {
 	 * unsigned depending on instruction.
 	 *
 	 * @param opcode         8-bit opcode.
-	 * @param signedImm24bit 24-bit immediate (masked to 0xFFFFFF).
+	 * @param signedImm24bit 24-bit immediate (signed, sign-magnitude).
 	 *
 	 * @return Encoded 32-bit instruction.
 	 */
@@ -70,7 +70,7 @@ public class FL32RHelper {
 	 *
 	 * @param opcode   8-bit opcode.
 	 * @param register 5-bit destination register (rd).
-	 * @param imm19Bit 19-bit immediate.
+	 * @param imm19Bit 19-bit immediate (unsigned).
 	 *
 	 * @return Encoded 32-bit instruction word.
 	 */
@@ -80,4 +80,35 @@ public class FL32RHelper {
 		imm19Bit &= 0x7FFFF;
 		return (opcode << 24) | (register << 19) | imm19Bit;
 	}
+	
+	/**
+	 * M-TYPE instruction encoder (register + register + 14-bit immediate).
+	 *
+	 * Format: [ opcode:8 | rd_or_rs:5 | rs1:5 | imm14:14 ]
+	 *
+	 * This format is used by memory-access instructions such as LDW, LDB, STW, STB,
+	 * and any other operations requiring two registers plus a 14-bit offset.
+	 *
+	 * The meaning of the first two register fields depends on the instruction: 
+	 * - For LOAD: rd = destination register, rs1 = base register. 
+	 * - For STORE: rd = source register, rs1 = base register.
+	 *
+	 * The low 14 bits encode the unsigned immediate offset. If the instruction
+	 * requires a signed displacement, it is sign-extended by the execution unit.
+	 *
+	 * @param opcode    8-bit opcode.
+	 * @param register0 First register field (rd or rs depending on instruction).
+	 * @param register1 Second register field (base register, rs1).
+	 * @param imm14Bit  14-bit immediate (signed, sign-magnitude).
+	 *
+	 * @return Encoded 32-bit instruction.
+	 */
+	public static int M(int opcode, int register0, int register1, int imm14Bit) {
+		opcode &= 0xFF;
+		register0 &= 0b11111;
+		register1 &= 0b11111;
+		imm14Bit &= 0x3FFF;
+		return (opcode << 24) | (register0 << 19) | (register1 << 14) | imm14Bit;
+	}
+	
 }

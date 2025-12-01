@@ -328,34 +328,37 @@ public class FL32REmulator implements GenericCPUEmulator {
 				writeRegister(rDest, immediate << 16); // pads 16 lower bits
 				break;
 			}
+			// LOAD convention: LOAD A, B, OFFSET <=> READ B + OFFSET STORE TO A
 			// load a word: rDest = Memory[rOp1]...[rOp1+3]
 			case LDW: {
-				int addr = readRegister(rOp1); // fetch mem address
-				writeRegister(rDest, readWordMemory(addr));
+				int baseAddress = readRegister(rOp1);
+				int offset = Utils.convertU14ToInt(operand & 0x3FFF);
+				writeRegister(rDest, readWordMemory(baseAddress + offset));
 				break;
 			}
 			// load a byte: rDest = Memory[rOp1]
 			case LDB: {
-				int addr = readRegister(rOp1);
-				writeRegister(rDest, readByteMemory(addr));
+				int baseAddress = readRegister(rOp1);
+				int offset = Utils.convertU14ToInt(operand & 0x3FFF);
+				writeRegister(rDest, readByteMemory(baseAddress + offset));
 				break;
 			}
+			// STORE convention: STORE A, B, OFFSET <=> READ A STORE TO B + OFFSET
 			// store a word: Memory[rMemDest...3] = rSrc
 			case STW: {
-				// disambiguation (rDest is ignored for STO)
-				int rSrc = rOp1, rMemDest = rOp2;
-				// value from 3rd operand
-				int value = readRegister(rSrc);
-				writeWordMemory(readRegister(rMemDest), value);
+				// disambiguation
+				int rSrc = rDest, baseAddress = readRegister(rOp1);
+				int offset = Utils.convertU14ToInt(operand & 0x3FFF);
+				writeWordMemory(baseAddress + offset, readRegister(rSrc));
 				break;
 			}
 			// store a byte: Memory[rMemDest] = rSrc
 			case STB: {
-				// disambiguation (rDest is ignored for STO)
-				int rSrc = rOp1, rMemDest = rOp2;
-				// value from 3rd operand
+				// disambiguation
+				int rSrc = rDest, baseAddress = readRegister(rOp1);
+				int offset = Utils.convertU14ToInt(operand & 0x3FFF);
 				byte value = (byte)(readRegister(rSrc) & 0xFF);
-				writeByteMemory(readRegister(rMemDest), value);
+				writeByteMemory(baseAddress + offset, value);
 				break;
 			}
 			// arithmetic operations: rDest = rOp1 [opcode] rOp2

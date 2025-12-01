@@ -9,10 +9,7 @@ import dev.gkvn.cpu.fl32r.FL32REmulator;
 import dev.gkvn.cpu.fl32r.Utils;
 
 import static dev.gkvn.cpu.fl32r.FL32RConstants.*;
-import static dev.gkvn.cpu.fl32r.FL32RHelper.I;
-import static dev.gkvn.cpu.fl32r.FL32RHelper.J;
-import static dev.gkvn.cpu.fl32r.FL32RHelper.R;
-import static dev.gkvn.cpu.fl32r.FL32RHelper.U;
+import static dev.gkvn.cpu.fl32r.FL32RHelper.*;
 
 import java.awt.*;
 import java.awt.image.BufferedImage;
@@ -37,7 +34,7 @@ public class EmulatedDisplay extends JPanel implements Runnable {
 			throw new RuntimeException("cannot do this, need at least: " + vramSize + " bytes of ram");
 		}
 		this.vramOffset = (int) (ramSize - vramSize); // leave 1 byte at the top of VRAM for buffer idnexing
-		//((FL32REmulator) emu).randomize(vramOffset);
+		((FL32REmulator) emu).randomize(vramOffset + 1);
 		System.out.println(vramOffset);
 		javaBuffer = new BufferedImage(WIDTH, HEIGHT, BufferedImage.TYPE_INT_RGB);
 	}
@@ -90,11 +87,12 @@ public class EmulatedDisplay extends JPanel implements Runnable {
 		int[] text = new int[] {
 			U(LUI, 1, 534413312 >>> 16),
 			I(ORI, 1, 534413312 & 0xFFFF),
-			U(LUI, 0, 0xFFFF),
-			I(ORI, 0, 0xFFFF & 0xFFFF),
-			R(STW, 0, 0, 1),
+//			U(LUI, 0, 0xFFFF),
+//			I(ORI, 0, 0xFFFF & 0xFFFF),
+			I(ADDI, 0, 0xff),
+			M(STW, 0, 1, 0),
 			I(ADDI, 1, 4),
-			J(JMP, Utils.convertIntToU24(-12)),
+			J(JMP, Utils.convertIntToU24(-16)),
 //			// LUI   R5, 0xABCD ; 16-bit upper bits
 //			U(LUI, 1, 0xFF),
 //			// MOV   R1, ZERO
