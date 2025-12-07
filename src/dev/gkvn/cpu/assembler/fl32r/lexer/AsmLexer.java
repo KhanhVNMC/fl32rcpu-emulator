@@ -32,6 +32,12 @@ public class AsmLexer {
 	private void scanToken() {
 		char c = advance();
 		switch (c) {
+			case '(':
+				addToken(TokenType.LPAREN);
+				break;
+			case ')':
+				addToken(TokenType.RPAREN);
+				break;
 			case '[':
 				addToken(TokenType.LSQUARE);
 				break;

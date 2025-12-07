@@ -15,23 +15,30 @@ public class FL32RConstants {
 		ADD  = 0x10, // add; rDest = rOp1 + rOp2
 		SUB  = 0x11, // same thing...
 		MUL  = 0x12,
-		DIV  = 0x13,
-		MOD  = 0x14,
-		AND  = 0x15,
-		OR   = 0x16,
-		XOR  = 0x17,
-		SHR  = 0x18, // shift right
-		SHL  = 0x19, // shift left
-		NOT  = 0x1A,
+		UMUL = 0x13,
+		DIV  = 0x14,
+		UDIV = 0x15,
+		MOD  = 0x16,
+		UMOD = 0x17,
+		AND  = 0x18,
+		OR   = 0x19,
+		XOR  = 0x1A,
+		SHR  = 0x1B, // shift right logic
+		SRA  = 0x1C, // shift right arithmetic
+		SHL  = 0x1D, // shift left
+		NOT  = 0x1E,
 		// immediate
-		ADDI = 0x1B,
-		ORI  = 0x1C,
-		XORI = 0x1D,
-		ANDI = 0x1E,
+		ADDI = 0x20,
+		ORI  = 0x21,
+		XORI = 0x22,
+		ANDI = 0x23,
+		SHLI = 0x24, // shift left
+		SRAI = 0x25, // shift right arithmetic
+		SHRI = 0x26, // shift right logic
 		
 		// STACK CONTROLS
-		PUSH = 0x20,
-		POP  = 0x21,
+		PUSH = 0x40,
+		POP  = 0x41,
 		
 		// FLOW CONTROLS
 		JMP  = 0x30, // [RJUMP = Relative Jump] jump to an offset relative to PC (set RPC)

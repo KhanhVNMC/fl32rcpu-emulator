@@ -11,6 +11,8 @@ public enum TokenType {
 	PLUS, MINUS, STAR, SLASH, MOD, // +-*/
 	LSQUARE, // [
 	RSQUARE, // ]
+	LPAREN, // (
+	RPAREN, // )
 	COMMA, // ,
 	NEWLINE, // \n
 	EOF, // end of file

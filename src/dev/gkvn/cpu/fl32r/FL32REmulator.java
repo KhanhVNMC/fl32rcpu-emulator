@@ -186,7 +186,7 @@ public class FL32REmulator implements GenericCPUEmulator {
 			// step to the next instruction, since execution may alter PC, this must be incremented here
 			this.writeRegister(REG_PROGRAM_COUNTER, currentPC + 4); // 4 bytes (32bit) instruction
 			// ===== DECODE =====
-			byte opcode = (byte) ((instruction >> 24) & 0xFF); // 8 MSB
+			byte opcode = (byte) ((instruction >>> 24) & 0xFF); // 8 MSB
 			int operand = instruction & 0xFFFFFF;
 			// ===== EXECUTE =====
 			long execStart = System.nanoTime();
@@ -366,12 +366,18 @@ public class FL32REmulator implements GenericCPUEmulator {
 			case MUL: case DIV: 
 			case MOD: {
 				int left = readRegister(rOp1), right = readRegister(rOp2);
+				long uLeft = Integer.toUnsignedLong(left), uRight = Integer.toUnsignedLong(right);
 				int result = switch (opcode) {
 					case ADD -> left + right;
 					case SUB -> left - right;
+					// signed
 					case MUL -> left * right;
 					case DIV -> right != 0 ? (left / right) : raiseFault(FaultType.FAULT_DIVZERO);
 					case MOD -> right != 0 ? (left % right) : raiseFault(FaultType.FAULT_DIVZERO);
+					// unsigned (a mess)
+					case UMUL -> (int)((uLeft * uRight)  & 0xFFFFFFFFL);
+					case UDIV -> uRight != 0 ? (int)((uLeft / uRight) & 0xFFFFFFFFL) : raiseFault(FaultType.FAULT_DIVZERO);
+					case UMOD -> uRight != 0 ? (int)((uLeft % uRight) & 0xFFFFFFFFL) : raiseFault(FaultType.FAULT_DIVZERO);
 					default -> raiseFault(FaultType.FAULT_ILLEGAL);
 				};
 				writeRegister(rDest, result);
@@ -388,7 +394,7 @@ public class FL32REmulator implements GenericCPUEmulator {
 			// bitwise operations:
 			case AND:
 			case OR: case XOR:
-			case SHL: case SHR: 
+			case SHL: case SHR: case SRA:
 			case NOT: {
 				int left = readRegister(rOp1), right = readRegister(rOp2);
 				int result = switch (opcode) {
@@ -397,6 +403,7 @@ public class FL32REmulator implements GenericCPUEmulator {
 					case XOR -> left ^ right;
 					case SHL -> left << right;
 					case SHR -> left >>> right;
+					case SRA -> left >> right;
 					case NOT -> ~left;
 					default -> raiseFault(FaultType.FAULT_ILLEGAL);
 				};
@@ -408,9 +415,9 @@ public class FL32REmulator implements GenericCPUEmulator {
 			// immediate arithmetic & bitwise ops (special ones)
 			// rDest [ophere]= immediate (19 bits lsb)
 			case ADDI:
-			case ANDI:
-			case XORI:
-			case ORI: {
+			case ANDI: case ORI: case XORI:
+			case SHRI: case SRAI:
+			case SHLI: {
 				int current = readRegister(rDest); 
 				int immediate = operand & ((1 << 19) - 1);
 				int result = switch (opcode) {
@@ -418,6 +425,9 @@ public class FL32REmulator implements GenericCPUEmulator {
 					case ANDI -> current & immediate;
 					case ORI  -> current | immediate;
 					case XORI -> current ^ immediate;
+					case SHLI -> current << (immediate & 0b11111);
+					case SHRI -> current >>> (immediate & 0b11111);
+					case SRAI -> current >> (immediate & 0b11111);
 					default -> raiseFault(FaultType.FAULT_ILLEGAL);
 				};
 				writeRegister(rDest, result);					
@@ -653,9 +663,9 @@ public class FL32REmulator implements GenericCPUEmulator {
 	 * @param data the 32-bit word to write
 	 */
 	final void writeWordMemory(int vAddress, int data) {
-		writeByteMemory(vAddress, (byte) ((data >> 24) & 0xFF));
-		writeByteMemory(vAddress + 1, (byte) ((data >> 16) & 0xFF));
-		writeByteMemory(vAddress + 2, (byte) ((data >> 8) & 0xFF));
+		writeByteMemory(vAddress, (byte) ((data >>> 24) & 0xFF));
+		writeByteMemory(vAddress + 1, (byte) ((data >>> 16) & 0xFF));
+		writeByteMemory(vAddress + 2, (byte) ((data >>> 8) & 0xFF));
 		writeByteMemory(vAddress + 3, (byte) (data & 0xFF));
 	}
 	
