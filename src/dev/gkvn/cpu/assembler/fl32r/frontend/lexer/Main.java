@@ -11,7 +11,7 @@ public class Main {
 		AsmLexer lex = new AsmLexer(Files.readString(Path.of("test.s")));
 		FLIREmitter p = new FLIREmitter(lex);
 		try {
-			p.emit();
+			System.out.println(p.emit().toString());
 		} catch (AsmError e) {
 			reportError(lex, e);
 		}
@@ -19,8 +19,8 @@ public class Main {
 	
 	private static void reportError(AsmLexer lex, AsmError e) {
 		Token t = e.token;
-		System.err.println("[ASM ERROR!] " + e.getMessage() + " at line " + t.line() + ", column " + t.column());
-		System.err.println("" + lex.sourceLines[t.line() - 1]);
+		System.err.println("[ASM ERROR!] " + e.getMessage() + " at line " + (t.line() + 1) + ", column " + t.column());
+		System.err.println("" + lex.sourceLines[t.line()]);
 		System.err.println("~".repeat(t.column()) + "^");
 	}
 }

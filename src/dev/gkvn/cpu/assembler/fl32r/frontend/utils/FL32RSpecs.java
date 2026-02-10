@@ -2,7 +2,7 @@ package dev.gkvn.cpu.assembler.fl32r.frontend.utils;
 
 import java.util.Map;
 
-import dev.gkvn.cpu.assembler.fl32r.frontend.exceptions.BackendError;
+import dev.gkvn.cpu.assembler.fl32r.frontend.exceptions.FrontendSolveError;
 import static dev.gkvn.cpu.fl32r.FL32RConstants.*;
 
 public class FL32RSpecs {
@@ -29,13 +29,13 @@ public class FL32RSpecs {
 		Map.entry("RDX", 3)
 	);
 
-	private static int parseNumericRegister(int n) throws BackendError {
+	private static int parseNumericRegister(int n) throws FrontendSolveError {
 		if (n >= 1 && n <= 24) return n - 1;
 		if (n == 0) return REG_ZERO;
-		throw new BackendError("Invalid register R" + n);
+		throw new FrontendSolveError("Invalid register R" + n);
 	}
 	
-	public static int parseRegister(String name) throws BackendError {
+	public static int parseRegister(String name) throws FrontendSolveError {
 		name = name.toUpperCase(); // normalize
 		Integer reg = NAMED_REGISTERS.get(name); // god help us, boxed int
 		if (reg != null) {
@@ -47,14 +47,14 @@ public class FL32RSpecs {
 				return parseNumericRegister(Integer.parseInt(name.substring(1)));
 			} catch (NumberFormatException e) {}
 		}
-		throw new BackendError("Unknown register file '" + name + "'");
+		throw new FrontendSolveError("Unknown register file '" + name + "'");
 	}
 	
-	public static int requireFitSigned(int bitWidth, int value) throws BackendError {
+	public static int requireFitSigned(int bitWidth, int value) throws FrontendSolveError {
 		int min = -(1 << (bitWidth - 1));
 		int max = (1 << (bitWidth - 1)) - 1;
 		if (value < min || value > max) {
-			throw new BackendError("Value " + value + " exceeds signed " + bitWidth + "-bit range");
+			throw new FrontendSolveError("Value " + value + " exceeds signed " + bitWidth + "-bit range");
 		}
 		return value;
 	}
@@ -64,10 +64,10 @@ public class FL32RSpecs {
 		return value >>> shift;
 	}
 	
-	public static int toNumber(String str) throws BackendError {
+	public static int toNumber(String str) throws FrontendSolveError {
 		String s = str.trim();
 		if (s.charAt(0) == '-') {
-			throw new BackendError("Not allowed here");
+			throw new FrontendSolveError("Not allowed here");
 		}
 		try {
 			if (s.startsWith("0x") || s.startsWith("0X")) {
@@ -78,7 +78,7 @@ public class FL32RSpecs {
 			}
 			return Integer.parseUnsignedInt(s, 10);
 		} catch (NumberFormatException e) {
-			throw new BackendError("Invalid numeric literal: " + str);
+			throw new FrontendSolveError("Invalid numeric literal: " + str);
 		}
 	}
 }

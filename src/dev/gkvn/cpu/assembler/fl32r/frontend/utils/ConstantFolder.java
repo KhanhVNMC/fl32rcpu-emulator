@@ -1,15 +1,15 @@
 package dev.gkvn.cpu.assembler.fl32r.frontend.utils;
 
-import dev.gkvn.cpu.assembler.fl32r.frontend.exceptions.BackendError;
+import dev.gkvn.cpu.assembler.fl32r.frontend.exceptions.FrontendSolveError;
 import dev.gkvn.cpu.assembler.fl32r.frontend.lexer.Token;
 import dev.gkvn.cpu.assembler.fl32r.frontend.lexer.TokenType;
 
 public class ConstantFolder {
-	public static int foldExpression(TokenStream stream) throws BackendError {
+	public static int foldExpression(TokenStream stream) throws FrontendSolveError {
 		return parseBitShifting(stream);
 	}
 	
-	private static int parseBitShifting(TokenStream stream) throws BackendError {
+	private static int parseBitShifting(TokenStream stream) throws FrontendSolveError {
 		int lvalue = parseAdditive(stream);
 		while (stream.consumeIfMatch(TokenType.BSR, TokenType.BSL)) {
 			Token op = stream.previous();
@@ -23,7 +23,7 @@ public class ConstantFolder {
 		return lvalue;
 	}
 	
-	private static int parseAdditive(TokenStream stream) throws BackendError {
+	private static int parseAdditive(TokenStream stream) throws FrontendSolveError {
 		int lvalue = parseMultiplicative(stream);
 		while (stream.consumeIfMatch(TokenType.PLUS, TokenType.MINUS)) {
 			Token op = stream.previous();
@@ -37,7 +37,7 @@ public class ConstantFolder {
 		return lvalue;
 	}
 	
-	private static int parseMultiplicative(TokenStream stream) throws BackendError {
+	private static int parseMultiplicative(TokenStream stream) throws FrontendSolveError {
 		int lvalue = parseUnary(stream);
 		while (stream.consumeIfMatch(
 			TokenType.STAR, TokenType.SLASH, TokenType.MOD
@@ -54,13 +54,13 @@ public class ConstantFolder {
 		return lvalue;
 	}
 	
-	private static int parseUnary(TokenStream stream) throws BackendError {
+	private static int parseUnary(TokenStream stream) throws FrontendSolveError {
 		if (stream.consumeIfMatch(TokenType.PLUS)) return parseUnary(stream);
 		if (stream.consumeIfMatch(TokenType.MINUS)) return -parseUnary(stream);
 		return parsePrimary(stream);
 	}
 	
-	private static int parsePrimary(TokenStream stream) throws BackendError {
+	private static int parsePrimary(TokenStream stream) throws FrontendSolveError {
 		if (stream.consumeIfMatch(TokenType.NUMBER)) {
 			return FL32RSpecs.toNumber(stream.previous().literal());
 		}

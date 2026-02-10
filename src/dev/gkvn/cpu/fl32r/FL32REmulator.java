@@ -502,15 +502,15 @@ public class FL32REmulator implements GenericCPUEmulator {
 				writeRegister(REG_PROGRAM_COUNTER, absAddress);
 				break;
 			}
-			// CLR (absolute call, jump to address (sits in register))
+			// CLR (absolute call, jump to address (sits in RDEST register))
 			case CLR: {
 				pushToStack(readRegister(REG_PROGRAM_COUNTER));
-				writeRegister(REG_PROGRAM_COUNTER, operand & 0xFFFFFF); // treat as unsigned 24-bit
+				writeRegister(REG_PROGRAM_COUNTER, readRegister(rDest));
 				break;
 			}
-			// ABSOLUTE JUMPS (jump straight to address (sits in register))
+			// ABSOLUTE JUMPS (jump straight to address (sits in RDEST register))
 			case JR: {
-				writeRegister(REG_PROGRAM_COUNTER, operand & 0xFFFFFF); // treat as unsigned 24-bit
+				writeRegister(REG_PROGRAM_COUNTER, readRegister(rDest));
 				break;
 			}
 			// RETURN (pop and jump)

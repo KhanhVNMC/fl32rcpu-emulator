@@ -11,9 +11,7 @@ public class AsmLexer {
 	// bookkeeping
 	private int start = 0; // the beginning of a token
 	private int current = 0;
-	
-	private int line = 1;
-	
+	private int line = 0;
 	private int startColumn = 0;
 	private int column = 0;
 
@@ -39,6 +37,14 @@ public class AsmLexer {
 	private void scanToken() {
 		char c = advance();
 		switch (c) {
+			// gloss over comments
+			case ';':
+			case '#':
+				// skip until end of line or EOF
+				while (peek() != '\n' && !isAtEnd()) {
+					advance();
+				}
+				break;
 			case '(':
 				addToken(TokenType.LPAREN);
 				break;

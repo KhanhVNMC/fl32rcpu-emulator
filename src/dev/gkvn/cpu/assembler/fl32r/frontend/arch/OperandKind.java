@@ -3,7 +3,7 @@ package dev.gkvn.cpu.assembler.fl32r.frontend.arch;
 public enum OperandKind {
     REG,
     MEMORY,
-    VARIABLE,
+    VARIABLE(0, true),
     IMM14_ABS(14, false),
     IMM16_ABS(16, false),
     IMM19_ABS(19, false),

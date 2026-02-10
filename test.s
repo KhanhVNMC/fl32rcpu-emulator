@@ -1,5 +1,7 @@
+@data
+vramOffset  .size(4) 534413312
 @text
-nowhere:
-JMP nowhere
-ADD RAX, RBX, RCX
-nowheare:
+ADDI   RAX, label
+JMP    label
+JMP    label
+label:

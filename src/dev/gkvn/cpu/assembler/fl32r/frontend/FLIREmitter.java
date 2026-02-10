@@ -23,7 +23,7 @@ import dev.gkvn.cpu.assembler.fl32r.frontend.lexer.TokenType;
 import dev.gkvn.cpu.assembler.fl32r.frontend.operands.ImmLabel;
 import dev.gkvn.cpu.assembler.fl32r.frontend.operands.ImmLiteral;
 import dev.gkvn.cpu.assembler.fl32r.frontend.operands.ImmVariable;
-import dev.gkvn.cpu.assembler.fl32r.frontend.operands.MemOpAddress;
+import dev.gkvn.cpu.assembler.fl32r.frontend.operands.SizedMemoryOperand;
 import dev.gkvn.cpu.assembler.fl32r.frontend.operands.MemoryOperand;
 import dev.gkvn.cpu.assembler.fl32r.frontend.operands.Operand;
 import dev.gkvn.cpu.assembler.fl32r.frontend.operands.RegisterOperand;
@@ -58,7 +58,7 @@ public class FLIREmitter {
 	
 	public List<TokenStream> lineTokens = new ArrayList<>();
 	
-	public void emit() throws AsmError {
+	public FrontendCAIR emit() throws AsmError {
 		// loop until the token stream is exhausted or EOF
 		while (!stream.isAtEnd() && !stream.consumeIfMatch(TokenType.EOF)) {
 			List<Token> line = new ArrayList<>();
@@ -74,6 +74,8 @@ public class FLIREmitter {
 			lineTokens.add(new TokenStream(line)); // accumulates
 		}
 		this.parseLines();
+		// box the results and return for codegen
+		return new FrontendCAIR(collectedInstructions, dataSectionBytes.toByteArray());
 	}
 	
 	// result of the IR emitter is here
@@ -115,12 +117,8 @@ public class FLIREmitter {
 				continue;
 			}
 		}
-		// final resolve, this will emit ready-to-use data for the backend generation
+		// final resolve, this will emit CONTEXT AWARE IR (CAIR) for the backend generation
 		this.resolveLabelAndVariableAddresses();
-		System.out.println(collectedInstructions);
-		System.out.println(dataSymbols);
-		
-		System.out.println("out: " + Arrays.toString(dataSectionBytes.toByteArray()));
 	}
 	
 	// DATA SECTION PARSING
@@ -152,9 +150,9 @@ public class FLIREmitter {
 		switch (dirTok.literal()) {
 			case TYPE_BYTE, TYPE_HALFWORD, TYPE_HW_ALIAS, TYPE_WORD -> {
 				elementSize = switch (dirTok.literal()) {
-					case TYPE_BYTE -> 1;
-					case TYPE_HALFWORD, TYPE_HW_ALIAS -> 2;
-					case TYPE_WORD -> 4;
+					case TYPE_BYTE -> 1; // duh
+					case TYPE_HALFWORD, TYPE_HW_ALIAS -> HWORD_SIZE;
+					case TYPE_WORD -> WORD_SIZE;
 					default -> throw new AssertionError();
 				};
 				elementCount = this.collectInitializers(line, elementSize);
@@ -365,8 +363,9 @@ public class FLIREmitter {
 					}
 					yield new ImmVariable(
 						varName, 
-						32, // allow full size
 						offset, 
+						32, // allow full size
+						expected.pcRelative,
 						varToken
 					);
 				}
@@ -436,8 +435,9 @@ public class FLIREmitter {
 						} else if (label.type() == TokenType.VARIABLE) { // variables (ONLY address)
 							yield new ImmVariable(
 								label.literal().substring(1), 
-								expected.bitWidth, // prevent overshooting
 								0, // cant do the offsetting here
+								expected.bitWidth, // prevent overshooting
+								expected.pcRelative, // yes you can jump into a variable (if you try)
 								label
 							);
 						}
@@ -498,6 +498,7 @@ public class FLIREmitter {
 					));
 					continue;
 				}
+				// dissolve variables
 				if (operand instanceof ImmVariable ivar) {
 					String varName = ivar.varname();
 					DataSymbol symbol = dataSymbols.get(varName); // resolve the variable
@@ -507,11 +508,22 @@ public class FLIREmitter {
 							ivar.owner()
 						);
 					}
-					int offset = ivar.offset() * symbol.elementSize();
-					operands[i] = new MemOpAddress(
-						(collectPC + symbol.address()) + offset - execPC,
-						symbol.elementSize()
-					);
+					int elemOffset = (collectPC + symbol.address()) + ivar.offset() * symbol.elementSize();
+					// you can do non memory (sto/load) with a variable, like: "ADDI R0, $variable" 
+					// its OK!, $variable is then treated as just a label (a pointer)
+					if (!ivar.pcRelative()) {
+						operands[i] = new ImmLiteral(Try.absorbAsm(() -> 
+							requireFitSigned(ivar.expectedBitWidth(), elemOffset),
+							ivar.owner()
+						));
+					} else {
+						// compute the pc relative for actual pc rel operands
+						int pcRelOffset = elemOffset - execPC;
+						operands[i] = new SizedMemoryOperand(
+							new MemoryOperand(RegisterOperand.PC_REG, new ImmLiteral(pcRelOffset)),
+							symbol.elementSize()
+						);
+					}
 				}
 			}
 			resolvePC = execPC; // update the PC, this is like a smol emu
