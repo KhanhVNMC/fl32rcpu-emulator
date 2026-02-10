@@ -34,7 +34,7 @@ public class EmulatedDisplay extends JPanel implements Runnable {
 			throw new RuntimeException("cannot do this, need at least: " + vramSize + " bytes of ram");
 		}
 		this.vramOffset = (int) (ramSize - vramSize); // leave 1 byte at the top of VRAM for buffer idnexing
-		((FL32REmulator) emu).randomize(vramOffset + 1);
+		//((FL32REmulator) emu).randomize(vramOffset + 1);
 		System.out.println(vramOffset);
 		javaBuffer = new BufferedImage(WIDTH, HEIGHT, BufferedImage.TYPE_INT_RGB);
 	}
@@ -56,10 +56,9 @@ public class EmulatedDisplay extends JPanel implements Runnable {
 				if (addr + 3 >= memory.length()) {
 					break;
 				}
-				int a = Byte.toUnsignedInt(memory.get(addr));
-				int r = Byte.toUnsignedInt(memory.get(addr + 1));
-				int g = Byte.toUnsignedInt(memory.get(addr + 2));
-				int b = Byte.toUnsignedInt(memory.get(addr + 3));
+				int r = Byte.toUnsignedInt(memory.get(addr));
+				int g = Byte.toUnsignedInt(memory.get(addr + 1));
+				int b = Byte.toUnsignedInt(memory.get(addr + 2));
 				int rgb = (r << 16) | (g << 8) | b;
 				javaBuffer.setRGB(x, y, rgb);
 				pixelIndex++;
@@ -82,7 +81,7 @@ public class EmulatedDisplay extends JPanel implements Runnable {
 	
 	public static void main(String[] args) {
 		FL32REmulator emu = new FL32REmulator(Calc.GB(0.5));
-		emu.setFrequencyHz(1_000_000); // 1MHZ cpu
+		emu.setFrequencyHz(1_000_000_000); // 1MHZ cpu
 		
 		int[] text = new int[] {
 			U(LUI, 1, 534413312 >>> 16),
@@ -92,7 +91,7 @@ public class EmulatedDisplay extends JPanel implements Runnable {
 			I(ADDI, 0, 0xff),
 			M(STW, 0, 1, 0),
 			I(ADDI, 1, 4),
-			J(JMP, Utils.convertIntToU24(-16)),
+			J(JMP, -16),
 			// LUI   R5, 0xABCD ; 16-bit upper bits
 			U(LUI, 1, 0xFF),
 			// MOV   R1, ZERO
@@ -129,6 +128,7 @@ public class EmulatedDisplay extends JPanel implements Runnable {
 			boot[i * 4 + 1] = (byte) ((text[i] >> 16) & 0xFF);
 			boot[i * 4 + 2] = (byte) ((text[i] >> 8) & 0xFF);
 			boot[i * 4 + 3] = (byte) (text[i] & 0xFF);
+			System.out.printf("%08X | %s\n", text[i], String.format("%32s", Integer.toBinaryString(text[i])).replace(' ', '0'));
 		}
 		emu.loadBootProgram(boot);
 		EmulatedDisplay screen = new EmulatedDisplay(emu);

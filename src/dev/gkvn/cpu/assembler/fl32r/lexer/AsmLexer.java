@@ -59,6 +59,16 @@ public class AsmLexer {
 			case '%':
 				addToken(TokenType.MOD);
 				break;
+			case '>':
+				if (match('>')) {
+					addToken(TokenType.BSR);
+				}
+				break;
+			case '<':
+				if (match('<')) {
+					addToken(TokenType.BSL);
+				}
+				break;
 			case ',':
 				addToken(TokenType.COMMA);
 				break;
@@ -80,7 +90,10 @@ public class AsmLexer {
 				directive();
 				break;
 			case '.':
-				directiveData();
+				dottedIdentifier();
+				break;
+			case '$':
+				variable();
 				break;
 			default: {
 				// if the value is digit, hand over the control to number();
@@ -98,11 +111,24 @@ public class AsmLexer {
 	/**
 	 * Scan the next directive
 	 */
-	private void directiveData() {
+	private void dottedIdentifier() {
 		while ( isAlphaNumeric(peek()) ) {
 			advance();
 		}
-		addToken(TokenType.DIRECTIVE_DATA);
+		addToken(TokenType.DOTTED_IDENTIFIER);
+	}
+	
+	/**
+	 * Scan the next directive
+	 */
+	private void variable() {
+		while ( isAlphaNumeric(peek()) ) {
+			advance();
+		}
+		// at this point, the current pointer would point at
+		// @hello|
+		//       ^ here
+		addToken(TokenType.VARIABLE);
 	}
 	
 	/**
@@ -209,7 +235,7 @@ public class AsmLexer {
 	 * @param expected
 	 * @return true if matches
 	 */
-	private boolean match(char expected) {
+	public boolean match(char expected) {
 		if (isAtEnd() || peek() != expected) {
 			return false;
 		}

@@ -56,6 +56,14 @@ public class TokenStream {
 	}
 	
 	/**
+	 * @return the token at the current pointer, the previous token if at end
+	 */
+	public Token peekNotNull() {
+		var peek = peekAhead(0);
+		return peek != null ? peek : previous();
+	}
+	
+	/**
 	 * @param steps steps to look ahead, 0 is the same as peek()
 	 * @return the token at the current pointer, null if at end
 	 */
@@ -77,7 +85,7 @@ public class TokenStream {
 	 * Same as peek().type == type
 	 */
 	public boolean check(TokenType type) {
-		return !isAtEnd() && peek().type == type;
+		return !isAtEnd() && peek().type() == type;
 	}
 	
 	/**
@@ -94,7 +102,7 @@ public class TokenStream {
 	public boolean peekMatch(TokenType... types) {
 		int look = currentToken; 
 		for (TokenType type : types) {
-			if (look >= tokens.size() || tokens.get(look).type != type) {
+			if (look >= tokens.size() || tokens.get(look).type() != type) {
 				return false;
 			}
 			look++;
@@ -129,7 +137,7 @@ public class TokenStream {
 			// advance pointer
 			return advance();
 		}
-		throw new RuntimeException(errorIfNotMatch + " | Last token: " + peek());
+		throw new RuntimeException(errorIfNotMatch);
 	}
 	
 	@Override

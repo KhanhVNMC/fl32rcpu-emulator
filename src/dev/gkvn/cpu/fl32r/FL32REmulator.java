@@ -328,18 +328,24 @@ public class FL32REmulator implements GenericCPUEmulator {
 				writeRegister(rDest, immediate << 16); // pads 16 lower bits
 				break;
 			}
+			// load an immediate to the lower 16 bits of a register
+			case LLI: {
+				int immediate = (operand >> 3) & 0xFFFF;
+				writeRegister(rDest, immediate);
+				break;
+			}
 			// LOAD convention: LOAD A, B, OFFSET <=> READ B + OFFSET STORE TO A
 			// load a word: rDest = Memory[rOp1]...[rOp1+3]
 			case LDW: {
 				int baseAddress = readRegister(rOp1);
-				int offset = Utils.convertU14ToInt(operand & 0x3FFF);
+				int offset = Utils.convertImm14ToInt(operand & 0x3FFF);
 				writeRegister(rDest, readWordMemory(baseAddress + offset));
 				break;
 			}
 			// load a byte: rDest = Memory[rOp1]
 			case LDB: {
 				int baseAddress = readRegister(rOp1);
-				int offset = Utils.convertU14ToInt(operand & 0x3FFF);
+				int offset = Utils.convertImm14ToInt(operand & 0x3FFF);
 				writeRegister(rDest, readByteMemory(baseAddress + offset));
 				break;
 			}
@@ -348,7 +354,7 @@ public class FL32REmulator implements GenericCPUEmulator {
 			case STW: {
 				// disambiguation
 				int rSrc = rDest, baseAddress = readRegister(rOp1);
-				int offset = Utils.convertU14ToInt(operand & 0x3FFF);
+				int offset = Utils.convertImm14ToInt(operand & 0x3FFF);
 				writeWordMemory(baseAddress + offset, readRegister(rSrc));
 				break;
 			}
@@ -356,15 +362,16 @@ public class FL32REmulator implements GenericCPUEmulator {
 			case STB: {
 				// disambiguation
 				int rSrc = rDest, baseAddress = readRegister(rOp1);
-				int offset = Utils.convertU14ToInt(operand & 0x3FFF);
+				int offset = Utils.convertImm14ToInt(operand & 0x3FFF);
 				byte value = (byte)(readRegister(rSrc) & 0xFF);
 				writeByteMemory(baseAddress + offset, value);
 				break;
 			}
 			// arithmetic operations: rDest = rOp1 [opcode] rOp2
 			case ADD: case SUB:
-			case MUL: case DIV: 
-			case MOD: {
+			case MUL: case UMUL: 
+			case DIV: case UDIV:
+			case MOD: case UMOD: {
 				int left = readRegister(rOp1), right = readRegister(rOp2);
 				long uLeft = Integer.toUnsignedLong(left), uRight = Integer.toUnsignedLong(right);
 				int result = switch (opcode) {
@@ -375,7 +382,7 @@ public class FL32REmulator implements GenericCPUEmulator {
 					case DIV -> right != 0 ? (left / right) : raiseFault(FaultType.FAULT_DIVZERO);
 					case MOD -> right != 0 ? (left % right) : raiseFault(FaultType.FAULT_DIVZERO);
 					// unsigned (a mess)
-					case UMUL -> (int)((uLeft * uRight)  & 0xFFFFFFFFL);
+					case UMUL -> (int)((uLeft * uRight) & 0xFFFFFFFFL);
 					case UDIV -> uRight != 0 ? (int)((uLeft / uRight) & 0xFFFFFFFFL) : raiseFault(FaultType.FAULT_DIVZERO);
 					case UMOD -> uRight != 0 ? (int)((uLeft % uRight) & 0xFFFFFFFFL) : raiseFault(FaultType.FAULT_DIVZERO);
 					default -> raiseFault(FaultType.FAULT_ILLEGAL);
@@ -413,13 +420,13 @@ public class FL32REmulator implements GenericCPUEmulator {
 				break;
 			}
 			// immediate arithmetic & bitwise ops (special ones)
-			// rDest [ophere]= immediate (19 bits lsb)
+			// rDest [ophere]= immediate (19 bits lsb; signed)
 			case ADDI:
 			case ANDI: case ORI: case XORI:
 			case SHRI: case SRAI:
 			case SHLI: {
 				int current = readRegister(rDest); 
-				int immediate = operand & ((1 << 19) - 1);
+				int immediate = Utils.convertImm19ToInt(operand);
 				int result = switch (opcode) {
 					case ADDI -> current + immediate;
 					case ANDI -> current & immediate;
@@ -467,7 +474,7 @@ public class FL32REmulator implements GenericCPUEmulator {
 			case JOF: case JNO: {
 				// read the current PC
 				int absAddress = readRegister(REG_PROGRAM_COUNTER);
-				absAddress += Utils.convertU24ToInt(operand); // add the rel-jump 
+				absAddress += Utils.convertImm24ToInt(operand); // add the rel-jump 
 				boolean shouldJump = switch (opcode) {
 					case JMP -> true;
 					case JEQ -> ZFL; // a - b == 0 <-> a == b
@@ -491,7 +498,7 @@ public class FL32REmulator implements GenericCPUEmulator {
 				pushToStack(readRegister(REG_PROGRAM_COUNTER));
 				// read the current PC and jump
 				int absAddress = readRegister(REG_PROGRAM_COUNTER);
-				absAddress += Utils.convertU24ToInt(operand); // add the rel-jump 
+				absAddress += Utils.convertImm24ToInt(operand); // add the rel-jump 
 				writeRegister(REG_PROGRAM_COUNTER, absAddress);
 				break;
 			}

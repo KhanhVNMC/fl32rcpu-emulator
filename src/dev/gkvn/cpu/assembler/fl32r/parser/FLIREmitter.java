@@ -1,0 +1,503 @@
+package dev.gkvn.cpu.assembler.fl32r.parser;
+
+import java.io.ByteArrayOutputStream;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import dev.gkvn.cpu.assembler.fl32r.lexer.AsmLexer;
+import dev.gkvn.cpu.assembler.fl32r.lexer.Token;
+import dev.gkvn.cpu.assembler.fl32r.lexer.TokenType;
+
+import static dev.gkvn.cpu.assembler.fl32r.parser.FL32RBackend.*;
+import static dev.gkvn.cpu.assembler.fl32r.parser.ConstantFolder.*;
+
+public class FLIREmitter {
+	final static String DATA_SECTION = "@data";
+	final static String TEXT_SECTION = "@text";
+	
+	// data type
+	final static String 
+		TYPE_CUSTOM_SIZE = ".size",
+		TYPE_CUSTOM_SIZE_ALIAS = ".space",
+		TYPE_BYTE = ".byte",
+		TYPE_HALFWORD = ".half",
+		TYPE_HW_ALIAS = ".hword",
+		TYPE_WORD = ".word",
+		TYPE_STRING = ".ascii",
+		TYPE_NT_STRING = ".asciz"
+	;
+	
+	// internal backed data structs
+	private AsmLexer lexer;
+	private TokenStream stream;
+	
+	public FLIREmitter(AsmLexer lexer) {
+		this.lexer = lexer;
+		this.lexer.scanTokens();
+		this.stream = new TokenStream(this.lexer.tokens);
+	}
+	
+	public List<TokenStream> lineTokens = new ArrayList<>();
+	
+	public void parse() {
+		// loop until the token stream is exhausted or EOF
+		while (!stream.isAtEnd() && !stream.consumeIfMatch(TokenType.EOF)) {
+			List<Token> line = new ArrayList<>();
+			// turn each line into its own token stream
+			while (!stream.consumeIfMatch(TokenType.NEWLINE)) {
+				Token next = stream.peek();
+				if (next.type() == TokenType.EOF) {
+					break; // do not consume EOF, break to the outer loop
+				}
+				line.add(next);
+				stream.advance();
+			}
+			lineTokens.add(new TokenStream(line)); // accumulates
+		}
+		this.parseLines();
+	}
+	
+	private ParsingContext context = ParsingContext.NONE;
+	
+	private List<Instruction> collectedInstructions = new ArrayList<>();
+	private Map<String, LabelText> labelAddresses = new HashMap<>();
+	
+	private void parseLines() {		
+		for (TokenStream line : lineTokens) {
+			if (line.isEmpty()) continue;
+			Token first = line.peek();
+			// switch context on directive
+			if (first.type() == TokenType.DIRECTIVE_SECTION) {
+				switch (first.literal()) {
+					case DATA_SECTION -> context = ParsingContext.DATA_SECTION;
+					case TEXT_SECTION -> context = ParsingContext.TEXT_SECTION;
+					default -> throw new AsmError("Unknown directive: " + first.literal(), first);
+				}
+				continue;
+			}
+			// no directive, throw an error
+			if (context == ParsingContext.NONE) {
+				throw new AsmError(
+					"Context Error. Encountered '" + first.literal() + "' before any section directive (@data or @text).",
+					first
+				);
+			}
+			if (context == ParsingContext.DATA_SECTION) {
+				// only a single pass is needed for data
+				this.parseDataSection(line);
+				continue;
+			}
+			if (context == ParsingContext.TEXT_SECTION) {
+				// this will build the first pass instruction IR
+				this.parseTextSection(this.collectedInstructions, line);
+				continue;
+			}
+		}
+		
+		this.resolveLabelAndVariableAddresses();
+		System.out.println(collectedInstructions);
+		System.out.println(dataSymbols);
+		
+		System.out.println("out: " + Arrays.toString(dataSectionBytes.toByteArray()));
+	}
+	
+	// DATA SECTION PARSING
+	private Map<String, DataSymbol> dataSymbols = new HashMap<>();
+	ByteArrayOutputStream dataSectionBytes = new ByteArrayOutputStream();
+	private int dataActivePointer = 0; // data section address counter
+
+	private void parseDataSection(TokenStream line) {
+		Token nameTok = line.advance();
+		if (nameTok.type() != TokenType.IDENTIFIER) {
+			throw new AsmError(
+				"Expected data symbol name, got " + nameTok, 
+				nameTok
+			);
+		}
+		String name = nameTok.literal();
+		if (dataSymbols.containsKey(name)) {
+			throw new AsmError(
+				"Data symbol '" + name + "' already defined at line " + dataSymbols.get(name).owner().line(),
+				nameTok
+			);
+		}
+		Token dirTok = line.advance();
+		if (dirTok.type() != TokenType.DOTTED_IDENTIFIER) {
+			throw new AsmError("Expected data directive after symbol name", dirTok);
+		}
+		
+		int elementSize;
+		int elementCount = 0;
+		switch (dirTok.literal()) {
+			case TYPE_BYTE, TYPE_HALFWORD, TYPE_HW_ALIAS, TYPE_WORD -> {
+				elementSize = switch (dirTok.literal()) {
+					case TYPE_BYTE -> 1;
+					case TYPE_HALFWORD, TYPE_HW_ALIAS -> 2;
+					case TYPE_WORD -> 4;
+					default -> throw new AssertionError();
+				};
+				elementCount = this.collectInitializers(line, elementSize);
+				if (elementCount == 0) {
+					throw new AsmError(
+						"Data symbol '" + name + "' requires at least one initializer.",
+						dirTok
+					);
+				}
+			}
+			case TYPE_CUSTOM_SIZE_ALIAS, TYPE_CUSTOM_SIZE -> {
+				Try.absorbAsm(
+					() -> line.consume(TokenType.LPAREN, "Expected '(' after .size/.space"),
+					line.peekNotNull()
+				);
+				elementSize = Try.absorbAsm(
+					() -> foldExpression(line),
+					line.peekNotNull()
+				);
+				Try.absorbAsm(
+					() -> line.consume(TokenType.RPAREN, "Expected ')'"),
+					line.peekNotNull()
+				);
+				elementCount = this.collectInitializers(line, elementSize);
+				
+				// you SHOULD NEVER DO .size(0) and then supply data, its stupid! 
+				if (elementSize == 0 && elementCount > 0) {
+					throw new AsmError(
+						"Element size must be greater than zero when initializers are present.", 
+						dirTok
+					);
+				}
+				
+				// if empty
+				if (elementCount == 0) {
+					elementCount = 1;
+					emitIntBE(0, elementSize); // emit one size'ed 0
+				}
+			}
+			case TYPE_STRING, TYPE_NT_STRING -> {
+				Token strToken = line.advance();
+				if (strToken.type() != TokenType.STRING) {
+					throw new AsmError(
+						".asciz/.ascii expects a string literal", 
+						strToken
+					);
+				}
+				// remove the '""'
+				String string = strToken.literal().substring(1, strToken.literal().length() - 1);
+				boolean isAsciiz = dirTok.literal().equals(TYPE_NT_STRING);
+				elementSize = 1;
+				elementCount = string.length() + (isAsciiz ? 1 : 0);
+				// emit the data
+				for (char c : string.toCharArray()) {
+					emitIntBE(c, elementSize);
+				}
+				if (isAsciiz) {
+					emitIntBE('\0', elementSize); // term byte 
+				}
+			}
+			default -> throw new AsmError(
+				"Unknown data directive '" + dirTok.literal() + "'", 
+				dirTok
+			);
+		}
+		
+		// assign the allocation table
+		DataSymbol symbol = new DataSymbol(
+			name, dataActivePointer, 
+			elementSize, 
+			elementCount, 
+			nameTok
+		);
+		dataSymbols.put(name, symbol);
+		dataActivePointer += symbol.totalSize();
+	}
+	
+	private int collectInitializers(TokenStream line, int size) {
+	    int count = 0;
+	    while (!line.isAtEnd()) {
+	    	// constexpr everywhere!
+	        this.emitIntBE(Try.absorbAsm(
+	        	() -> foldExpression(line), 
+	        	line.peekNotNull()
+	        ), size);
+	        line.consumeIfMatch(TokenType.COMMA);
+	        count++;
+	    }
+	    return count;
+	}
+	
+	private void emitIntBE(int value, int size) {
+		for (int i = size - 1; i >= 0; i--) {
+			dataSectionBytes.write((int) (urshift(value, (i * 8) & 0xFF)));
+		}
+	}
+	
+	// TEXT SECTION PARSING
+	private int collectPC = 0; // 1st pass program counter (collecting)
+	private void parseTextSection(List<Instruction> collected, TokenStream line) {
+		// collect labels
+		if (line.consumeIfMatch(TokenType.LABEL)) {
+			String labelName = line.previous().literal(); // name
+			LabelText label = labelAddresses.get(labelName);
+			if (label != null) {
+				throw new AsmError(
+					"Label already defined at line " + label.owner().line() + "!", 
+					line.previous()
+				);
+			}
+			// collect the token for error reporting too
+			labelAddresses.put(labelName, new LabelText(
+				labelName, this.collectPC, line.previous()
+			));
+		}
+		
+		if (line.isAtEnd()) return; // the label could've exhausted the stream 
+		
+		// parse the actual instruction
+		Token opToken = line.advance();
+		if (opToken.type() != TokenType.IDENTIFIER) {
+			throw new AsmError(
+				"Expected an opcode identifier, got " + opToken.type() + ".", 
+				opToken
+			);
+		}
+		String opcode = opToken.literal().toUpperCase();
+		FrontendOp blueprint = FrontendOp.get(opcode);
+		if (blueprint == null) {
+			throw new AsmError(
+				"Unknown opcode '" + opcode + "'", 
+				opToken
+			);
+		}
+
+		var expectedOperands = blueprint.getOperandKinds();
+		var parsedOperands = new ArrayList<List<Token>>(3); // expected at most 3 elements
+		// collect
+		while (!line.isAtEnd()) {
+			List<Token> cluster = new ArrayList<>(5); // worst case [R1 + CONST] -> 5 tokens
+			// parse until either EOL or a comma
+			while (!line.isAtEnd() && !line.consumeIfMatch(TokenType.COMMA)) {
+				cluster.add(line.advance());
+			}
+			parsedOperands.add(cluster);
+		}
+		
+		if (expectedOperands.length != parsedOperands.size()) {
+			throw new AsmError(
+				"Opcode '" + opcode + "' expects " + expectedOperands.length 
+				+ " operands, but got " + parsedOperands.size() + ".", 
+				opToken
+			);
+		}
+		
+		// this is the smelly part
+		Operand[] operands = new Operand[expectedOperands.length];
+		
+		for (int i = 0; i < expectedOperands.length; ++i) {
+			OperandKind expected = expectedOperands[i];
+			List<Token> parsed = parsedOperands.get(i);
+			if (parsed.isEmpty()) {
+				throw new AsmError(
+					"Missing operand for opcode '" + opcode + "'.", 
+					opToken
+				);
+			}
+ 			
+			// less smelly thanks to java
+			operands[i] = switch (expected) {
+				case REG: { 
+					if (parsed.size() != 1) {
+						throw new AsmError(
+							"Expected a single register operand (e.g. R1, R2, ...).", 
+							parsed.get(0)
+						);
+					}
+					Token first = parsed.get(0);
+					if (first.type() != TokenType.IDENTIFIER) {
+						throw new AsmError(
+							"Expected a register", 
+							first
+						);
+					}
+					yield new RegisterOperand(
+						Try.absorbAsm(() -> parseRegister(first.literal()), first)
+					);
+				}
+				case VARIABLE: {
+					// this is for some shorthand pseudo-op
+					Token varToken = parsed.get(0);
+					if (varToken.type() != TokenType.VARIABLE) {
+						throw new AsmError(
+							"Expected a defined variable/const",
+							varToken
+						);
+					}
+					String varName = varToken.literal().substring(1); // strip the $
+					int offset = 0;
+					// optional bracket
+					TokenStream bracket = new TokenStream(parsed); // like one below
+					bracket.advance(); // consume the var name
+					if (bracket.consumeIfMatch(TokenType.LSQUARE)) {
+						offset = Try.absorbAsm(() -> foldExpression(bracket), bracket.peekNotNull());
+						Try.absorbAsm(() -> bracket.consume(TokenType.RSQUARE, 
+							"Expected a closing ']' in variable offset operand!"
+						), bracket.peekNotNull());
+					}
+					yield new ImmVariable(
+						varName, 
+						32, // allow full size
+						offset, 
+						varToken
+					);
+				}
+				case MEMORY: {
+					// just the register, no offset at all
+					// this is for the old spec: LDW/STW R1, R2
+					if (parsed.size() == 1) {
+						Token first = parsed.get(0);
+						if (first.type() != TokenType.IDENTIFIER) {
+							throw new AsmError(
+								"Expected a single register operand (e.g. R1, R2, ...).", 
+								first
+							);
+						}
+						yield new MemoryOperand(new RegisterOperand(
+							Try.absorbAsm(() -> parseRegister(first.literal()), first)
+						), new ImmLiteral(0));
+					}
+					// bracket
+					TokenStream bracket = new TokenStream(parsed); // special 
+					Try.absorbAsm(
+						() -> bracket.consume(TokenType.LSQUARE, "Expected '[' to start memory operand (e.g. [R1] or [R1 + 4])!"),
+						bracket.peekNotNull()
+					);
+					// this will throw if mismatch
+					Token baseRegToken = bracket.advance();
+					RegisterOperand base = new RegisterOperand(
+						Try.absorbAsm(() -> parseRegister(baseRegToken.literal()), baseRegToken)
+					); 
+					ImmLiteral offset = null;
+					if (!bracket.peekMatch(TokenType.RSQUARE)) {
+						Token offsetToken = bracket.advance(); // consume it
+						if (!offsetToken.is(TokenType.PLUS, TokenType.MINUS)) {
+							throw new AsmError(
+								"Memory operand offset must use '+' or '-' relative to the base register",
+								offsetToken
+							);
+						}
+						// at this point the pointer is at the start of the equation to fold
+						offset = new ImmLiteral(
+							Try.absorbAsm(() -> foldExpression(bracket), bracket.peekNotNull()) * 
+							(offsetToken.is(TokenType.MINUS) ? -1 : 1)
+						); 
+					} else {
+						offset = new ImmLiteral(0); // no offset, standard syntax
+					}
+					Try.absorbAsm(
+						() -> bracket.consume(TokenType.RSQUARE, "Expected a closing ']' in memory operand!"),
+						bracket.peekNotNull()
+					);
+					yield new MemoryOperand(base, offset);
+				}
+				case IMM14_ABS: case IMM16_ABS: case IMM19_ABS:
+				case IMM24_ABS: case IMM24_PC_REL: // PC relative
+				case IMM32_ABS: {
+					// if size == 1 & dotted identifier -> must be label
+					// or variable ($var) -> address to the variable
+					if (parsed.size() == 1) { 
+						Token label = parsed.get(0);
+						if (label.type() == TokenType.DOTTED_IDENTIFIER) { // labels
+							yield new ImmLabel(
+								label.literal().substring(1),
+								expected.bitWidth, // prevent overshooting
+								expected.pcRelative,
+								label
+							);
+						} else if (label.type() == TokenType.VARIABLE) { // variables (ONLY address)
+							yield new ImmVariable(
+								label.literal().substring(1), 
+								expected.bitWidth, // prevent overshooting
+								0, // cant do the offsetting here
+								label
+							);
+						}
+					}
+					// inlined value (allow for expressions)
+					int value = Try.absorbAsm(() -> 
+						requireFitSigned(expected.bitWidth, 
+							foldExpression(new TokenStream(parsed))
+						),
+						parsed.get(0)
+					);
+					yield new ImmLiteral(value);
+				}
+				default: {
+					throw new AsmError("Not implemented", opToken);
+				} // never happen, istg
+			};
+		}
+		
+		// collect the parsed instruction IR
+		Instruction instruction = new Instruction(blueprint, operands);
+		collected.add(instruction);
+		this.collectPC += instruction.getSize();
+	}
+	
+	// FINALIZE
+	private void resolveLabelAndVariableAddresses() {
+		int resolvePC = 0; // 2nd pass PC
+		for (var instruction : this.collectedInstructions) {
+			// FL32R spec: the cpu increments PC right after FETCH
+			// so when it executes, the PC IS ALREADY ON THE NEXT INSTRUCTION
+			int execPC = resolvePC + instruction.getSize(); // PC after fetch
+			var operands = instruction.operands;
+			for (int i = 0; i < operands.length; ++i) {
+				Operand operand = operands[i];
+				// dissolve labels
+				if (operand instanceof ImmLabel ilabel) {
+					String labelStr = ilabel.label();
+					LabelText label = labelAddresses.get(labelStr); // resolve the label
+					if (label == null) {
+						throw new AsmError(
+							"Unknown label: '" + labelStr + "'", 
+							ilabel.owner()
+						);
+					}
+					int labelValue;
+					if (ilabel.pcRelative()) {
+						// PC relative (rules apply)
+						labelValue = label.address() - execPC;
+					} else {
+						// raw address
+						labelValue = label.address();
+					}
+					// prevent value overshooting
+					operands[i] = new ImmLiteral(Try.absorbAsm(() -> 
+						requireFitSigned(ilabel.expectedBitWidth(), labelValue),
+						ilabel.owner()
+					));
+					continue;
+				}
+				if (operand instanceof ImmVariable ivar) {
+					String varName = ivar.varname();
+					DataSymbol symbol = dataSymbols.get(varName); // resolve the variable
+					if (symbol == null) {
+						throw new AsmError(
+							"Unknown variable: '" + varName + "'", 
+							ivar.owner()
+						);
+					}
+					System.out.println(collectPC);
+					int offset = ivar.offset() * symbol.elementSize();
+					operands[i] = new MemOpAddress(
+						(collectPC + symbol.address()) + offset - execPC,
+						symbol.elementSize()
+					);
+				}
+			}
+			resolvePC = execPC; // update the PC, this is like a smol emu
+		}
+	}
+} 

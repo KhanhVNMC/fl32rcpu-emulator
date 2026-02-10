@@ -6,9 +6,10 @@ public enum TokenType {
 	STRING, // "s t r i n g"
 	CHAR, // 'c'
 	LABEL, // label:
-	DIRECTIVE_DATA, // .type 
+	DOTTED_IDENTIFIER, // .identifier 
 	DIRECTIVE_SECTION, // @data, @text
-	PLUS, MINUS, STAR, SLASH, MOD, // +-*/
+	VARIABLE, // $var
+	PLUS, MINUS, STAR, SLASH, MOD, BSR, BSL, // +-*/
 	LSQUARE, // [
 	RSQUARE, // ]
 	LPAREN, // (

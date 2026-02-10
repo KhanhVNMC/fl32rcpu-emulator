@@ -6,10 +6,11 @@ public class FL32RConstants {
 		// DATA controls
 		MOV  = 0x01, // reg-to-reg move; rDest = rSrc
 		LUI  = 0x02, // load upper immediate (16-bit MSB); clears rDest before loading
-		LDW  = 0x03, // load word from mem into reg; rDest = Memory[rAddr]...Memory[rAddr + 3]
-		LDB  = 0x04, // load byte from mem into reg; rDest = Memory[rAddr]
-		STW  = 0x05, // store word from reg into mem; Memory[rAddr]..Memory[rAddr + 3] = rSrc
-		STB  = 0x06, // store byte from reg into mem; Memory[rAddr] = rSrc
+		LLI  = 0x03, // load lower immediate (16-bit MSB); clears rDest...
+		LDW  = 0x04, // load word from mem into reg; rDest = Memory[rAddr]...Memory[rAddr + 3]
+		LDB  = 0x05, // load byte from mem into reg; rDest = Memory[rAddr]
+		STW  = 0x06, // store word from reg into mem; Memory[rAddr]..Memory[rAddr + 3] = rSrc
+		STB  = 0x07, // store byte from reg into mem; Memory[rAddr] = rSrc
 		
 		// ARITHMETIC CONTROLS
 		ADD  = 0x10, // add; rDest = rOp1 + rOp2

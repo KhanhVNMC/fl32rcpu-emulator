@@ -21,7 +21,7 @@ public class FL32RHelper {
 	}
 
 	/**
-	 * R-TYPE instruction encoder (register�register).
+	 * R-TYPE instruction encoder (register<->register).
 	 *
 	 * Format: [ opcode:8 | rd:5 | rs1:5 | rs2:5 | unused:9 ]
 	 *
@@ -51,7 +51,7 @@ public class FL32RHelper {
 	 * unsigned depending on instruction.
 	 *
 	 * @param opcode         8-bit opcode.
-	 * @param signedImm24bit 24-bit immediate (signed, sign-magnitude).
+	 * @param signedImm24bit 24-bit immediate (signed, 2's complement).
 	 *
 	 * @return Encoded 32-bit instruction.
 	 */
@@ -70,7 +70,7 @@ public class FL32RHelper {
 	 *
 	 * @param opcode   8-bit opcode.
 	 * @param register 5-bit destination register (rd).
-	 * @param imm19Bit 19-bit immediate (unsigned).
+	 * @param imm19Bit 19-bit immediate (signed).
 	 *
 	 * @return Encoded 32-bit instruction word.
 	 */
@@ -99,7 +99,7 @@ public class FL32RHelper {
 	 * @param opcode    8-bit opcode.
 	 * @param register0 First register field (rd or rs depending on instruction).
 	 * @param register1 Second register field (base register, rs1).
-	 * @param imm14Bit  14-bit immediate (signed, sign-magnitude).
+	 * @param imm14Bit  14-bit immediate (signed, 2's complement).
 	 *
 	 * @return Encoded 32-bit instruction.
 	 */

@@ -5,53 +5,25 @@ public class Utils {
 		return (b0 & 0xFF) << 24 | (b1 & 0xFF) << 16 | (b2 & 0xFF) << 8 | (b3 & 0xFF);
 	}
 	
-	/**
-	 * THIS IS SIGN-MAGNITUDE, NOT 2'S COMPLEMENT
-	 * <p>
-	 * The MOST SIGNIFICANT bit is the sign (0 = positive, 1 = negative), and the
-	 * lower N - 1 bits represent the magnitude
-	 */
-	public static final int convertU24ToInt(int u24) {
-		u24 &= 0xFFFFFF;
-		if ((u24 & 0x800000) != 0) {
-			return -(u24 & 0x7FFFFF); // lower 23 bits, negate
-		} else {
-			return u24 & 0x7FFFFF; // positive value
+	public static final int convertNBitNumToInt(int n, int value) {
+		final int mask = (1 << n) - 1;
+		value &= mask;
+		if ((value >>> (n - 1)) != 0) { // holy fuck
+			return (0xFFFFFFFF << n) | (value & mask);
 		}
+		return value;
 	}
 	
-	/**
-	 * THIS IS SIGN-MAGNITUDE, NOT 2'S COMPLEMENT
-	 */
-	public static final int convertIntToU24(int number) {
-		if (number < 0) {
-			return 0x800000 | (-number & 0x7FFFFF);
-		} else {
-			return number & 0x7FFFFF;
-		}
+	public static final int convertImm14ToInt(int imm14) {
+		return convertNBitNumToInt(14, imm14);
 	}
 	
-	/**
-	 * THIS IS SIGN-MAGNITUDE, NOT 2'S COMPLEMENT
-	 */
-	public static final int convertU14ToInt(int u14) {
-		u14 &= (1 << 14) - 1;
-		if ((u14 & 0x2000) != 0) {
-			return -(u14 & 0x1FFF); // lower 13 bits, negate
-		} else {
-			return u14 & 0x1FFF; // positive value
-		}
+	public static final int convertImm19ToInt(int imm19) {
+		return convertNBitNumToInt(19, imm19);
 	}
 	
-	/**
-	 * THIS IS SIGN-MAGNITUDE, NOT 2'S COMPLEMENT
-	 */
-	public static final int convertIntToU14(int number) {
-		if (number < 0) {
-			return 0x2000 | (-number & 0x1FFF);
-		} else {
-			return number & 0x1FFF;
-		}
+	public static final int convertImm24ToInt(int imm24) {
+		return convertNBitNumToInt(24, imm24);
 	}
 	
 	/**
