@@ -1,6 +1,7 @@
-package dev.gkvn.cpu.assembler.fl32r.parser;
+package dev.gkvn.cpu.assembler.fl32r.frontend.utils;
 
-import dev.gkvn.cpu.assembler.fl32r.lexer.Token;
+import dev.gkvn.cpu.assembler.fl32r.frontend.exceptions.AsmError;
+import dev.gkvn.cpu.assembler.fl32r.frontend.lexer.Token;
 
 public final class Try {
 	private Try() {}

@@ -1,16 +1,11 @@
-package dev.gkvn.cpu.assembler.fl32r.parser;
+package dev.gkvn.cpu.assembler.fl32r.frontend.utils;
 
-import java.util.List;
 import java.util.Map;
 
-import dev.gkvn.cpu.assembler.fl32r.lexer.Token;
-import dev.gkvn.cpu.assembler.fl32r.lexer.TokenType;
-import dev.gkvn.cpu.assembler.fl32r.parser.exceptions.BackendError;
-import dev.gkvn.cpu.fl32r.FL32RConstants;
-
+import dev.gkvn.cpu.assembler.fl32r.frontend.exceptions.BackendError;
 import static dev.gkvn.cpu.fl32r.FL32RConstants.*;
 
-public class FL32RBackend {
+public class FL32RSpecs {
 	// static bruh
 	public static final int FL32R_SIZE = 4; // 4 BYTES per instruction
 	public static final int FL32R_REGISTERS_COUNT = 32;

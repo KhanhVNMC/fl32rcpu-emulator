@@ -1,4 +1,4 @@
-package dev.gkvn.cpu.assembler.fl32r.lexer;
+package dev.gkvn.cpu.assembler.fl32r.frontend.lexer;
 
 public record Token(TokenType type, String literal, int line, int column) {
 	public boolean is(TokenType... types) {

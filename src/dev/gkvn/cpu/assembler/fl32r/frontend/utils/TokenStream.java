@@ -1,9 +1,9 @@
-package dev.gkvn.cpu.assembler.fl32r.parser;
+package dev.gkvn.cpu.assembler.fl32r.frontend.utils;
 
 import java.util.List;
 
-import dev.gkvn.cpu.assembler.fl32r.lexer.Token;
-import dev.gkvn.cpu.assembler.fl32r.lexer.TokenType;
+import dev.gkvn.cpu.assembler.fl32r.frontend.lexer.Token;
+import dev.gkvn.cpu.assembler.fl32r.frontend.lexer.TokenType;
 
 public class TokenStream {
 	private int currentToken;

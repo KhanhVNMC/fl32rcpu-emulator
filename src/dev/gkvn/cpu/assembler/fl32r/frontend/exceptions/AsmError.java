@@ -1,12 +1,12 @@
-package dev.gkvn.cpu.assembler.fl32r.parser;
+package dev.gkvn.cpu.assembler.fl32r.frontend.exceptions;
 
-import dev.gkvn.cpu.assembler.fl32r.lexer.Token;
+import dev.gkvn.cpu.assembler.fl32r.frontend.lexer.Token;
 
 public class AsmError extends RuntimeException {
     public final Token token;
 
     public AsmError(String message, Token token) {
-        super(message + " at " + token.line() + ":" + token.column());
+        super(message);
         this.token = token;
     }
 }

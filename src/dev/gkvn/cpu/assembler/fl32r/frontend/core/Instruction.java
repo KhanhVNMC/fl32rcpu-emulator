@@ -1,7 +1,10 @@
-package dev.gkvn.cpu.assembler.fl32r.parser;
+package dev.gkvn.cpu.assembler.fl32r.frontend.core;
 
 import java.util.HashSet;
 import java.util.Set;
+
+import dev.gkvn.cpu.assembler.fl32r.frontend.arch.FrontendOp;
+import dev.gkvn.cpu.assembler.fl32r.frontend.operands.Operand;
 
 public class Instruction {
 	public final FrontendOp opcode;

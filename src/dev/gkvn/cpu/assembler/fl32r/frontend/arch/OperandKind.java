@@ -1,6 +1,6 @@
-package dev.gkvn.cpu.assembler.fl32r.parser;
+package dev.gkvn.cpu.assembler.fl32r.frontend.arch;
 
-enum OperandKind {
+public enum OperandKind {
     REG,
     MEMORY,
     VARIABLE,
@@ -11,8 +11,8 @@ enum OperandKind {
     IMM24_PC_REL(24, true),
     IMM32_ABS(32, false);
 	
-    final int bitWidth;
-    final boolean pcRelative;
+	public final int bitWidth;
+    public final boolean pcRelative;
     
     OperandKind(int bitWidth, boolean pcRelative) {
         this.bitWidth = bitWidth;

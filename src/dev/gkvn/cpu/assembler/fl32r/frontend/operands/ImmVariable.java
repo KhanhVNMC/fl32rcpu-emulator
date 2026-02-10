@@ -1,6 +1,6 @@
-package dev.gkvn.cpu.assembler.fl32r.parser;
+package dev.gkvn.cpu.assembler.fl32r.frontend.operands;
 
-import dev.gkvn.cpu.assembler.fl32r.lexer.Token;
+import dev.gkvn.cpu.assembler.fl32r.frontend.lexer.Token;
 
 public record ImmVariable(String varname, int expectedBitWidth, int offset, Token owner) implements ImmOperand {
 	@Override

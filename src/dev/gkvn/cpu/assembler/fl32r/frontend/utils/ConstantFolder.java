@@ -1,8 +1,8 @@
-package dev.gkvn.cpu.assembler.fl32r.parser;
+package dev.gkvn.cpu.assembler.fl32r.frontend.utils;
 
-import dev.gkvn.cpu.assembler.fl32r.lexer.Token;
-import dev.gkvn.cpu.assembler.fl32r.lexer.TokenType;
-import dev.gkvn.cpu.assembler.fl32r.parser.exceptions.BackendError;
+import dev.gkvn.cpu.assembler.fl32r.frontend.exceptions.BackendError;
+import dev.gkvn.cpu.assembler.fl32r.frontend.lexer.Token;
+import dev.gkvn.cpu.assembler.fl32r.frontend.lexer.TokenType;
 
 public class ConstantFolder {
 	public static int foldExpression(TokenStream stream) throws BackendError {
@@ -62,7 +62,7 @@ public class ConstantFolder {
 	
 	private static int parsePrimary(TokenStream stream) throws BackendError {
 		if (stream.consumeIfMatch(TokenType.NUMBER)) {
-			return FL32RBackend.toNumber(stream.previous().literal());
+			return FL32RSpecs.toNumber(stream.previous().literal());
 		}
 		if (stream.consumeIfMatch(TokenType.CHAR)) {
 			return stream.previous().literal().charAt(1);

@@ -1,4 +1,4 @@
-package dev.gkvn.cpu.assembler.fl32r.lexer;
+package dev.gkvn.cpu.assembler.fl32r.frontend.lexer;
 
 public enum TokenType {
 	IDENTIFIER, // anything, even opcode
@@ -6,7 +6,7 @@ public enum TokenType {
 	STRING, // "s t r i n g"
 	CHAR, // 'c'
 	LABEL, // label:
-	DOTTED_IDENTIFIER, // .identifier 
+	DIRECTIVE, // .directive 
 	DIRECTIVE_SECTION, // @data, @text
 	VARIABLE, // $var
 	PLUS, MINUS, STAR, SLASH, MOD, BSR, BSL, // +-*/

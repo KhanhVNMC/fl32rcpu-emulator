@@ -1,4 +1,4 @@
-package dev.gkvn.cpu.assembler.fl32r.parser;
+package dev.gkvn.cpu.assembler.fl32r.frontend.operands;
 
 public record MemoryOperand(RegisterOperand base, ImmOperand offset) implements Operand {
 	@Override

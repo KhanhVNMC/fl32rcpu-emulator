@@ -1,7 +1,7 @@
-package dev.gkvn.cpu.assembler.fl32r.parser;
+package dev.gkvn.cpu.assembler.fl32r.frontend.arch;
 
-import static dev.gkvn.cpu.assembler.fl32r.parser.OperandKind.*;
-import static dev.gkvn.cpu.assembler.fl32r.parser.FL32RBackend.*;
+import static dev.gkvn.cpu.assembler.fl32r.frontend.arch.OperandKind.*;
+import static dev.gkvn.cpu.assembler.fl32r.frontend.utils.FL32RSpecs.*;
 
 public enum FrontendOp {
 	ADD   (FL32R_SIZE * 1, REG, REG, REG),
@@ -12,7 +12,6 @@ public enum FrontendOp {
 	// pseudo-op (instructions that expand into other instruction(s))
 	LDI   (FL32R_SIZE * 2, REG, IMM32_ABS),
 	LD    (FL32R_SIZE * 1, REG, VARIABLE),
-	TEST  (4)
 	;
 	
 	// cunt

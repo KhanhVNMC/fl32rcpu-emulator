@@ -1,4 +1,4 @@
-package dev.gkvn.cpu.assembler.fl32r.parser.exceptions;
+package dev.gkvn.cpu.assembler.fl32r.frontend.exceptions;
 
 public class BackendError extends Exception {
 	public BackendError(String string) {

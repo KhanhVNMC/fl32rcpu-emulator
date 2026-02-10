@@ -1,9 +1,11 @@
-package dev.gkvn.cpu.assembler.fl32r.parser;
+package dev.gkvn.cpu.assembler.fl32r.frontend.operands;
+
+import dev.gkvn.cpu.assembler.fl32r.frontend.utils.FL32RSpecs;
 
 public record RegisterOperand(int register) implements Operand {
 	
 	public RegisterOperand {
-		if (register < 0 || register >= FL32RBackend.FL32R_REGISTERS_COUNT) {
+		if (register < 0 || register >= FL32RSpecs.FL32R_REGISTERS_COUNT) {
 			throw new IllegalArgumentException("Invalid register index: " + register);
 		}
 	}

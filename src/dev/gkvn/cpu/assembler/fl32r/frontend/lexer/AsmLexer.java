@@ -1,20 +1,26 @@
-package dev.gkvn.cpu.assembler.fl32r.lexer;
+package dev.gkvn.cpu.assembler.fl32r.frontend.lexer;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public class AsmLexer {
 	private final String source;
+	public final String[] sourceLines;
 	public final List<Token> tokens = new ArrayList<>();
 
 	// bookkeeping
 	private int start = 0; // the beginning of a token
 	private int current = 0;
+	
 	private int line = 1;
+	
+	private int startColumn = 0;
+	private int column = 0;
 
 	// assign a source for this lexer
 	public AsmLexer(String source) {
 		this.source = source;
+		this.sourceLines = source.split("\\R", -1);
 	}
 
 	public void scanTokens() {
@@ -22,11 +28,12 @@ public class AsmLexer {
 		// current char index to the current one, and then scan the token
 		while (!isAtEnd()) {
 			start = current;
+			startColumn = column;
 			scanToken();
 		}
 		
 		// end of file
-		tokens.add(new Token(TokenType.EOF, "", line, current));
+		tokens.add(new Token(TokenType.EOF, "", line, column));
 	}
 	
 	private void scanToken() {
@@ -78,6 +85,7 @@ public class AsmLexer {
 				break; // ignore whitespaces
 			case '\n':
 				addToken(TokenType.NEWLINE);
+				column = 0;
 				line++; // next line
 				break;
 			case '\'':
@@ -115,7 +123,7 @@ public class AsmLexer {
 		while ( isAlphaNumeric(peek()) ) {
 			advance();
 		}
-		addToken(TokenType.DOTTED_IDENTIFIER);
+		addToken(TokenType.DIRECTIVE);
 	}
 	
 	/**
@@ -220,6 +228,7 @@ public class AsmLexer {
 	 * @return same thing as peek(), but advances the pointer
 	 */
 	private char advance() {
+		column++;
 		return source.charAt(current++);
 	}
 	
@@ -246,7 +255,7 @@ public class AsmLexer {
 	private void addToken(TokenType type) {
 		// "start" is the beginning of a token (set at each interval of scanTokens())
 		String literal = source.substring(start, current);
-		tokens.add(new Token(type, literal, line, start));
+		tokens.add(new Token(type, literal, line, startColumn));
 	}
 
 	/**

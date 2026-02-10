@@ -1,4 +1,7 @@
-package dev.gkvn.cpu.assembler.fl32r.parser;
+package dev.gkvn.cpu.assembler.fl32r.frontend;
+
+import static dev.gkvn.cpu.assembler.fl32r.frontend.utils.ConstantFolder.*;
+import static dev.gkvn.cpu.assembler.fl32r.frontend.utils.FL32RSpecs.*;
 
 import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
@@ -7,12 +10,25 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import dev.gkvn.cpu.assembler.fl32r.lexer.AsmLexer;
-import dev.gkvn.cpu.assembler.fl32r.lexer.Token;
-import dev.gkvn.cpu.assembler.fl32r.lexer.TokenType;
-
-import static dev.gkvn.cpu.assembler.fl32r.parser.FL32RBackend.*;
-import static dev.gkvn.cpu.assembler.fl32r.parser.ConstantFolder.*;
+import dev.gkvn.cpu.assembler.fl32r.frontend.arch.FrontendOp;
+import dev.gkvn.cpu.assembler.fl32r.frontend.arch.OperandKind;
+import dev.gkvn.cpu.assembler.fl32r.frontend.core.DataSymbol;
+import dev.gkvn.cpu.assembler.fl32r.frontend.core.Instruction;
+import dev.gkvn.cpu.assembler.fl32r.frontend.core.LabelText;
+import dev.gkvn.cpu.assembler.fl32r.frontend.core.ParsingContext;
+import dev.gkvn.cpu.assembler.fl32r.frontend.exceptions.AsmError;
+import dev.gkvn.cpu.assembler.fl32r.frontend.lexer.AsmLexer;
+import dev.gkvn.cpu.assembler.fl32r.frontend.lexer.Token;
+import dev.gkvn.cpu.assembler.fl32r.frontend.lexer.TokenType;
+import dev.gkvn.cpu.assembler.fl32r.frontend.operands.ImmLabel;
+import dev.gkvn.cpu.assembler.fl32r.frontend.operands.ImmLiteral;
+import dev.gkvn.cpu.assembler.fl32r.frontend.operands.ImmVariable;
+import dev.gkvn.cpu.assembler.fl32r.frontend.operands.MemOpAddress;
+import dev.gkvn.cpu.assembler.fl32r.frontend.operands.MemoryOperand;
+import dev.gkvn.cpu.assembler.fl32r.frontend.operands.Operand;
+import dev.gkvn.cpu.assembler.fl32r.frontend.operands.RegisterOperand;
+import dev.gkvn.cpu.assembler.fl32r.frontend.utils.TokenStream;
+import dev.gkvn.cpu.assembler.fl32r.frontend.utils.Try;
 
 public class FLIREmitter {
 	final static String DATA_SECTION = "@data";
@@ -42,7 +58,7 @@ public class FLIREmitter {
 	
 	public List<TokenStream> lineTokens = new ArrayList<>();
 	
-	public void parse() {
+	public void emit() throws AsmError {
 		// loop until the token stream is exhausted or EOF
 		while (!stream.isAtEnd() && !stream.consumeIfMatch(TokenType.EOF)) {
 			List<Token> line = new ArrayList<>();
@@ -60,12 +76,15 @@ public class FLIREmitter {
 		this.parseLines();
 	}
 	
-	private ParsingContext context = ParsingContext.NONE;
-	
+	// result of the IR emitter is here
 	private List<Instruction> collectedInstructions = new ArrayList<>();
+	ByteArrayOutputStream dataSectionBytes = new ByteArrayOutputStream();
+	
+	// bookkeeping and result
+	private ParsingContext context = ParsingContext.NONE;
 	private Map<String, LabelText> labelAddresses = new HashMap<>();
 	
-	private void parseLines() {		
+	private void parseLines() throws AsmError {		
 		for (TokenStream line : lineTokens) {
 			if (line.isEmpty()) continue;
 			Token first = line.peek();
@@ -96,7 +115,7 @@ public class FLIREmitter {
 				continue;
 			}
 		}
-		
+		// final resolve, this will emit ready-to-use data for the backend generation
 		this.resolveLabelAndVariableAddresses();
 		System.out.println(collectedInstructions);
 		System.out.println(dataSymbols);
@@ -106,7 +125,6 @@ public class FLIREmitter {
 	
 	// DATA SECTION PARSING
 	private Map<String, DataSymbol> dataSymbols = new HashMap<>();
-	ByteArrayOutputStream dataSectionBytes = new ByteArrayOutputStream();
 	private int dataActivePointer = 0; // data section address counter
 
 	private void parseDataSection(TokenStream line) {
@@ -125,7 +143,7 @@ public class FLIREmitter {
 			);
 		}
 		Token dirTok = line.advance();
-		if (dirTok.type() != TokenType.DOTTED_IDENTIFIER) {
+		if (dirTok.type() != TokenType.DIRECTIVE) {
 			throw new AsmError("Expected data directive after symbol name", dirTok);
 		}
 		
@@ -404,13 +422,13 @@ public class FLIREmitter {
 				case IMM14_ABS: case IMM16_ABS: case IMM19_ABS:
 				case IMM24_ABS: case IMM24_PC_REL: // PC relative
 				case IMM32_ABS: {
-					// if size == 1 & dotted identifier -> must be label
+					// if size == 1 & identifier -> must be label
 					// or variable ($var) -> address to the variable
 					if (parsed.size() == 1) { 
 						Token label = parsed.get(0);
-						if (label.type() == TokenType.DOTTED_IDENTIFIER) { // labels
+						if (label.type() == TokenType.IDENTIFIER) { // labels
 							yield new ImmLabel(
-								label.literal().substring(1),
+								label.literal(),
 								expected.bitWidth, // prevent overshooting
 								expected.pcRelative,
 								label
@@ -489,7 +507,6 @@ public class FLIREmitter {
 							ivar.owner()
 						);
 					}
-					System.out.println(collectPC);
 					int offset = ivar.offset() * symbol.elementSize();
 					operands[i] = new MemOpAddress(
 						(collectPC + symbol.address()) + offset - execPC,
