@@ -4,9 +4,9 @@ import java.util.Arrays;
 import java.util.List;
 import dev.gkvn.cpu.assembler.fl32r.frontend.core.Instruction;
 
-public record FrontendCAIR(List<Instruction> instructions, byte[] dataSection) {
+public record FrontendCAIR(List<Instruction> instructions, IRDataSection dataSection) {
 	public int estimateCodegenSize() {
-		int total = dataSection.length;
+		int total = dataSection.dataBytes().length;
 		for (Instruction i : instructions) {
 			total += i.getSize();
 		}
@@ -15,6 +15,6 @@ public record FrontendCAIR(List<Instruction> instructions, byte[] dataSection) {
 	
 	@Override
 	public final String toString() {
-		return "FL32RAsmCAIR{instructions=" + instructions + ", dataBytes=" + Arrays.toString(dataSection) + "}";
+		return "FL32RAsmCAIR{instructions=" + instructions + ", dataBytes=" + Arrays.toString(dataSection.dataBytes()) + "}";
 	}
 }

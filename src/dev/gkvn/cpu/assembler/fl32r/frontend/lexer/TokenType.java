@@ -8,7 +8,7 @@ public enum TokenType {
 	LABEL, // label:
 	DIRECTIVE, // .directive 
 	DIRECTIVE_SECTION, // @data, @text
-	VARIABLE, // $var
+	VAR, // $var
 	PLUS, MINUS, STAR, SLASH, MOD, BSR, BSL, // +-*/
 	LSQUARE, // [
 	RSQUARE, // ]

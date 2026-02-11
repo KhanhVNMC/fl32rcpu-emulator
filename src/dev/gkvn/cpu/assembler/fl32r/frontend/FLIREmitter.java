@@ -5,13 +5,12 @@ import static dev.gkvn.cpu.assembler.fl32r.frontend.utils.FL32RSpecs.*;
 
 import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import dev.gkvn.cpu.assembler.fl32r.frontend.arch.FrontendOp;
-import dev.gkvn.cpu.assembler.fl32r.frontend.arch.OperandKind;
+import dev.gkvn.cpu.assembler.fl32r.frontend.arch.FEOpCode;
+import dev.gkvn.cpu.assembler.fl32r.frontend.arch.FEOperandType;
 import dev.gkvn.cpu.assembler.fl32r.frontend.core.DataSymbol;
 import dev.gkvn.cpu.assembler.fl32r.frontend.core.Instruction;
 import dev.gkvn.cpu.assembler.fl32r.frontend.core.LabelText;
@@ -75,7 +74,13 @@ public class FLIREmitter {
 		}
 		this.parseLines();
 		// box the results and return for codegen
-		return new FrontendCAIR(collectedInstructions, dataSectionBytes.toByteArray());
+		return new FrontendCAIR(
+			collectedInstructions, // instruction (text)
+			new IRDataSection( // data
+				this.dataSymbols, // we may need the table later
+				dataSectionBytes.toByteArray()
+			)
+		);
 	}
 	
 	// result of the IR emitter is here
@@ -280,7 +285,7 @@ public class FLIREmitter {
 			);
 		}
 		String opcode = opToken.literal().toUpperCase();
-		FrontendOp blueprint = FrontendOp.get(opcode);
+		FEOpCode blueprint = FEOpCode.get(opcode);
 		if (blueprint == null) {
 			throw new AsmError(
 				"Unknown opcode '" + opcode + "'", 
@@ -312,7 +317,7 @@ public class FLIREmitter {
 		Operand[] operands = new Operand[expectedOperands.length];
 		
 		for (int i = 0; i < expectedOperands.length; ++i) {
-			OperandKind expected = expectedOperands[i];
+			FEOperandType expected = expectedOperands[i];
 			List<Token> parsed = parsedOperands.get(i);
 			if (parsed.isEmpty()) {
 				throw new AsmError(
@@ -323,6 +328,7 @@ public class FLIREmitter {
  			
 			// less smelly thanks to java
 			operands[i] = switch (expected) {
+				// REGISTER: R1, R2, R3, ...
 				case REG: { 
 					if (parsed.size() != 1) {
 						throw new AsmError(
@@ -341,10 +347,11 @@ public class FLIREmitter {
 						Try.absorbAsm(() -> parseRegister(first.literal()), first)
 					);
 				}
+				// $var, $var[offset]
 				case VARIABLE: {
 					// this is for some shorthand pseudo-op
 					Token varToken = parsed.get(0);
-					if (varToken.type() != TokenType.VARIABLE) {
+					if (varToken.type() != TokenType.VAR) {
 						throw new AsmError(
 							"Expected a defined variable/const",
 							varToken
@@ -364,8 +371,7 @@ public class FLIREmitter {
 					yield new ImmVariable(
 						varName, 
 						offset, 
-						32, // allow full size
-						expected.pcRelative,
+						32, true, // max width, true = pcRelative
 						varToken
 					);
 				}
@@ -432,7 +438,7 @@ public class FLIREmitter {
 								expected.pcRelative,
 								label
 							);
-						} else if (label.type() == TokenType.VARIABLE) { // variables (ONLY address)
+						} else if (label.type() == TokenType.VAR) { // variables (ONLY address)
 							yield new ImmVariable(
 								label.literal().substring(1), 
 								0, // cant do the offsetting here
@@ -444,7 +450,8 @@ public class FLIREmitter {
 					}
 					// inlined value (allow for expressions)
 					int value = Try.absorbAsm(() -> 
-						requireFitSigned(expected.bitWidth, 
+						requireFitBits(
+							expected.bitWidth, 
 							foldExpression(new TokenStream(parsed))
 						),
 						parsed.get(0)
@@ -463,7 +470,7 @@ public class FLIREmitter {
 		this.collectPC += instruction.getSize();
 	}
 	
-	// FINALIZE
+	// FINALIZE (we dont have a linker so this is the final result)
 	private void resolveLabelAndVariableAddresses() {
 		int resolvePC = 0; // 2nd pass PC
 		for (var instruction : this.collectedInstructions) {
@@ -493,7 +500,10 @@ public class FLIREmitter {
 					}
 					// prevent value overshooting
 					operands[i] = new ImmLiteral(Try.absorbAsm(() -> 
-						requireFitSigned(ilabel.expectedBitWidth(), labelValue),
+						requireFitBits(
+							ilabel.expectedBitWidth(), 
+							labelValue
+						),
 						ilabel.owner()
 					));
 					continue;
@@ -508,19 +518,25 @@ public class FLIREmitter {
 							ivar.owner()
 						);
 					}
-					int elemOffset = (collectPC + symbol.address()) + ivar.offset() * symbol.elementSize();
+					int elemOffset = (collectPC + symbol.addressOffset()) + ivar.offset() * symbol.elementSize();
 					// you can do non memory (sto/load) with a variable, like: "ADDI R0, $variable" 
 					// its OK!, $variable is then treated as just a label (a pointer)
 					if (!ivar.pcRelative()) {
 						operands[i] = new ImmLiteral(Try.absorbAsm(() -> 
-							requireFitSigned(ivar.expectedBitWidth(), elemOffset),
+							requireFitBits(
+								ivar.expectedBitWidth(), 
+								elemOffset
+							),
 							ivar.owner()
 						));
 					} else {
 						// compute the pc relative for actual pc rel operands
 						int pcRelOffset = elemOffset - execPC;
 						operands[i] = new SizedMemoryOperand(
-							new MemoryOperand(RegisterOperand.PC_REG, new ImmLiteral(pcRelOffset)),
+							new MemoryOperand(
+								RegisterOperand.PC_REG, 
+								new ImmLiteral(pcRelOffset)
+							),
 							symbol.elementSize()
 						);
 					}

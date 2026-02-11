@@ -142,7 +142,7 @@ public class AsmLexer {
 		// at this point, the current pointer would point at
 		// @hello|
 		//       ^ here
-		addToken(TokenType.VARIABLE);
+		addToken(TokenType.VAR);
 	}
 	
 	/**

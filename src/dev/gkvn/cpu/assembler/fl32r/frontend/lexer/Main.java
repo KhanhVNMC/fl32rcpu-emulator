@@ -3,6 +3,7 @@ package dev.gkvn.cpu.assembler.fl32r.frontend.lexer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+import dev.gkvn.cpu.assembler.fl32r.backend.BackendCodegen;
 import dev.gkvn.cpu.assembler.fl32r.frontend.FLIREmitter;
 import dev.gkvn.cpu.assembler.fl32r.frontend.exceptions.AsmError;
 
@@ -11,7 +12,7 @@ public class Main {
 		AsmLexer lex = new AsmLexer(Files.readString(Path.of("test.s")));
 		FLIREmitter p = new FLIREmitter(lex);
 		try {
-			System.out.println(p.emit().toString());
+			new BackendCodegen(p.emit()).gen();
 		} catch (AsmError e) {
 			reportError(lex, e);
 		}

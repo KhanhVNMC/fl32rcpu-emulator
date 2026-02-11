@@ -3,15 +3,15 @@ package dev.gkvn.cpu.assembler.fl32r.frontend.core;
 import java.util.HashSet;
 import java.util.Set;
 
-import dev.gkvn.cpu.assembler.fl32r.frontend.arch.FrontendOp;
+import dev.gkvn.cpu.assembler.fl32r.frontend.arch.FEOpCode;
 import dev.gkvn.cpu.assembler.fl32r.frontend.operands.Operand;
 
 public class Instruction {
-	public final FrontendOp opcode;
+	public final FEOpCode opcode;
 	public Operand[] operands;
 	private Set<Object> metadata = new HashSet<>(); 
 
-	public Instruction(FrontendOp opcode, Operand... operands) {
+	public Instruction(FEOpCode opcode, Operand... operands) {
 		this.opcode = opcode;
 		this.operands = operands;
 	}

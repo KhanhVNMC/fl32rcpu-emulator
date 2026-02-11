@@ -50,15 +50,28 @@ public class FL32RSpecs {
 		throw new FrontendSolveError("Unknown register file '" + name + "'");
 	}
 	
-	public static int requireFitSigned(int bitWidth, int value) throws FrontendSolveError {
-		int min = -(1 << (bitWidth - 1));
-		int max = (1 << (bitWidth - 1)) - 1;
-		if (value < min || value > max) {
-			throw new FrontendSolveError("Value " + value + " exceeds signed " + bitWidth + "-bit range");
+	public static int requireFitBits(int bitWidth, int value) throws FrontendSolveError {
+		if (bitWidth <= 0 || bitWidth > 32) {
+			throw new IllegalArgumentException("Invalid bit width, how did you get here? Width: " + bitWidth);
 		}
-		return value;
+		if (bitWidth < 32) {
+			int mask = (1 << bitWidth) - 1;
+			boolean fitsUnsigned = (value & ~mask) == 0;
+			// what the fuck even is this
+			boolean fitsSigned = ((value << (32 - bitWidth)) >> (32 - bitWidth)) == value;
+			
+			if (fitsUnsigned || fitsSigned) {
+				return value & mask; // prevent java from sign extending the fuck out of it
+			}
+		} else {
+			return value; // always fit, 32 bit, duh
+		}
+		throw new FrontendSolveError(
+			"Value %d (0x%s) does not fit in %d bits", 
+			value, Integer.toHexString(value), bitWidth
+		);
 	}
-	
+
 	public static int urshift(int value, int shift) {
 		if (shift >= 32) return 0;
 		return value >>> shift;
@@ -78,7 +91,7 @@ public class FL32RSpecs {
 			}
 			return Integer.parseUnsignedInt(s, 10);
 		} catch (NumberFormatException e) {
-			throw new FrontendSolveError("Invalid numeric literal: " + str);
+			throw new FrontendSolveError("Invalid numeric literal (pro tip: 32-bit is the max): " + str);
 		}
 	}
 }

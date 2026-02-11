@@ -2,11 +2,27 @@ package dev.gkvn.cpu.fl32r;
 
 public class FL32RHelper {
 	/**
+	 * NO-TYPE (no-operands) instruction encoder
+	 * 
+	 * Format: [ opcode:8 | unused:24 ]
+	 * 
+	 * Straight fucking forward.
+	 * 
+	 * @param opcode      8-bit opcode value.
+	 * 
+	 * @return Encoded 32-bit instruction.
+	 */
+	public static int NO(int opcode) {
+		opcode &= 0xFF;
+		return (opcode << 24);
+	}
+	
+	/**
 	 * U-TYPE instruction encoder.
 	 *
 	 * Format: [ opcode:8 | rd:5 | imm16:16 | unused:3 ]
 	 *
-	 * Used by LUI (load upper immediate).
+	 * Used by LUI (load upper immediate) and LLI (load lower imm).
 	 *
 	 * @param opcode      8-bit opcode value.
 	 * @param register    5-bit destination register (rd).
@@ -17,6 +33,7 @@ public class FL32RHelper {
 	public static int U(int opcode, int register, int upper16Bits) {
 		opcode &= 0xFF;
 		register &= 0b11111;
+		upper16Bits &= 0xFFFF;
 		return (opcode << 24) | (register << 19) | (upper16Bits << 3);
 	}
 

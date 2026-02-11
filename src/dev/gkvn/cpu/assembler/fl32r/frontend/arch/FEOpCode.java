@@ -1,9 +1,9 @@
 package dev.gkvn.cpu.assembler.fl32r.frontend.arch;
 
-import static dev.gkvn.cpu.assembler.fl32r.frontend.arch.OperandKind.*;
+import static dev.gkvn.cpu.assembler.fl32r.frontend.arch.FEOperandType.*;
 import static dev.gkvn.cpu.assembler.fl32r.frontend.utils.FL32RSpecs.*;
 
-public enum FrontendOp {
+public enum FEOpCode {
 	// actual ops
 	MOV   (1, REG, REG),
 	LUI   (1, REG, IMM16_ABS),
@@ -63,21 +63,23 @@ public enum FrontendOp {
 	VMB   (1, REG),
 	HLR   (1, REG),
 	
+	NOP   (1),
 	HLT   (1),
 	KILL  (1),
 	
 	// pseudo-op (instructions that expand into other instruction(s))
 	LDI   (2, REG, IMM32_ABS),
 	LD    (1, REG, VARIABLE),
+	ST    (1, VARIABLE, REG),
 	;
 	
 	// cunt
 	private final int size;
-	private final OperandKind[] operands;
+	private final FEOperandType[] operands;
 	
-	public static final FrontendOp[] values = FrontendOp.values();
+	public static final FEOpCode[] values = FEOpCode.values();
 	
-	FrontendOp(int expandInto, OperandKind... operands) {
+	FEOpCode(int expandInto, FEOperandType... operands) {
 		this.size = expandInto * FL32R_SIZE;
 		this.operands = operands;
 	}
@@ -86,13 +88,13 @@ public enum FrontendOp {
 		return size;
 	}
 	
-	public OperandKind[] getOperandKinds() {
+	public FEOperandType[] getOperandKinds() {
 		return operands;
 	}
 	
-	public static FrontendOp get(String str) {
+	public static FEOpCode get(String str) {
 		try {
-			return FrontendOp.valueOf(str);
+			return FEOpCode.valueOf(str);
 		} catch (Exception e) {
 			return null;
 		}
