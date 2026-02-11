@@ -83,7 +83,9 @@ public class EmulatedDisplay extends JPanel implements Runnable {
 		FL32REmulator emu = new FL32REmulator(Calc.GB(0.5));
 		emu.setFrequencyHz(1_000_000_000); // 1MHZ cpu
 		
-		int[] text = new int[] {
+		int[] text = new int[] {4, 6, -128, 76, 32, -64, 0, -1, 6, 6, 0, 0, 32, 0, 0, 4, 48, -1, -1, -20, 1, 6, 0, 0, 33, 0, 0, -1, 1, 6, 0, 0, 33, 0, 0, 5, 32, 0, 0, 10, 32, 0, 0, 20, 1, -64, 0, 0, 16, 14, 0, 0, 64, 8, 0, 0, 65, 16, 0, 0, 64, 16, 0, 0, 48, 0, 0, 4, 123, 0, 0, 0, 1, 62, -128, 0, 123, 0, 0, 0, 31, -38, -128, 0};
+		
+		int[] atext = new int[] {
 			U(LUI, 1, 534413312 >>> 16),
 			I(ORI, 1, 534413312 & 0xFFFF),
 //			U(LUI, 0, 0xFFFF),
