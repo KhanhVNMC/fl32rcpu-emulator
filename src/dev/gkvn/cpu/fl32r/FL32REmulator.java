@@ -310,10 +310,11 @@ public class FL32REmulator implements GenericCPUEmulator {
 	}
 	
 	final void execute(byte opcode, int operand) {
-		// operand could be interpreted differently
-		int rDest = (operand >> 19) & 0b11111;
+		// register operand could be interpreted differently
+		int rOp0 = (operand >> 19) & 0b11111;
 		int rOp1 = (operand >> 14) & 0b11111;
 		int rOp2 = (operand >> 9) & 0b11111;
+		int rDest = rOp0; // rOp0 could be interpreted as rDestination
 		
 		switch (opcode) {
 			case NOP: { break; }
@@ -346,7 +347,8 @@ public class FL32REmulator implements GenericCPUEmulator {
 			case LDB: {
 				int baseAddress = readRegister(rOp1);
 				int offset = Utils.convertImm14ToInt(operand & 0x3FFF);
-				writeRegister(rDest, readByteMemory(baseAddress + offset));
+				// mask off the upper 24 bits (0xFF)
+				writeRegister(rDest, readByteMemory(baseAddress + offset), 0xFF);
 				break;
 			}
 			// STORE convention: STORE A, B, OFFSET <=> READ A STORE TO B + OFFSET
@@ -456,9 +458,9 @@ public class FL32REmulator implements GenericCPUEmulator {
 				writeRegister(rDest, popFromStack());
 				break;
 			}
-			// COMPARE (like SUB): r0 - r1
+			// COMPARE (like SUB): r0 (rOp0) - r1 (rOp1) [rOp2 is ignored]
 			case CMP: {
-				int left = readRegister(rOp1), right = readRegister(rOp2);
+				int left = readRegister(rOp0), right = readRegister(rOp1);
 				int result = left - right;
 				// set the flags
 				this.ZFL = result == 0;
@@ -580,6 +582,10 @@ public class FL32REmulator implements GenericCPUEmulator {
 	
 	// REGISTER MANIPULATION
 	final void writeRegister(int regIndex, int value) {
+		this.writeRegister(regIndex, value, 0xFF_FF_FF_FF); // no-op mask
+	}
+	
+	final void writeRegister(int regIndex, int value, int mask) {
 		regIndex &= 0b11111;
 		if (regIndex == REG_ZERO) return; // prevent writes to Zero reg
 		// prevent accessing a forbidden register
@@ -587,7 +593,7 @@ public class FL32REmulator implements GenericCPUEmulator {
 			this.raiseFault(FaultType.FAULT_PRIV);
 			return;
 		}
-		this.registers[regIndex] = value; // write, zoop
+		this.registers[regIndex] = value & mask; // write, zoop
 	}
 	
 	final int readRegister(int regIndex) {

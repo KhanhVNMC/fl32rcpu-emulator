@@ -16,6 +16,7 @@ import dev.gkvn.cpu.assembler.fl32r.frontend.core.Instruction;
 import dev.gkvn.cpu.assembler.fl32r.frontend.core.LabelText;
 import dev.gkvn.cpu.assembler.fl32r.frontend.core.ParsingContext;
 import dev.gkvn.cpu.assembler.fl32r.frontend.exceptions.AsmError;
+import dev.gkvn.cpu.assembler.fl32r.frontend.exceptions.FrontendSolveError;
 import dev.gkvn.cpu.assembler.fl32r.frontend.lexer.AsmLexer;
 import dev.gkvn.cpu.assembler.fl32r.frontend.lexer.Token;
 import dev.gkvn.cpu.assembler.fl32r.frontend.lexer.TokenType;
@@ -26,6 +27,7 @@ import dev.gkvn.cpu.assembler.fl32r.frontend.operands.SizedMemoryOperand;
 import dev.gkvn.cpu.assembler.fl32r.frontend.operands.MemoryOperand;
 import dev.gkvn.cpu.assembler.fl32r.frontend.operands.Operand;
 import dev.gkvn.cpu.assembler.fl32r.frontend.operands.RegisterOperand;
+import dev.gkvn.cpu.assembler.fl32r.frontend.utils.FL32RSpecs;
 import dev.gkvn.cpu.assembler.fl32r.frontend.utils.TokenStream;
 import dev.gkvn.cpu.assembler.fl32r.frontend.utils.Try;
 
@@ -192,7 +194,7 @@ public class FLIREmitter {
 				}
 				
 				// if empty
-				if (elementCount == 0) {
+				if (elementCount == 0 && elementSize > 0) { // allow for aliasing
 					elementCount = 1;
 					emitIntBE(0, elementSize); // emit one size'ed 0
 				}
@@ -232,21 +234,25 @@ public class FLIREmitter {
 			nameTok
 		);
 		dataSymbols.put(name, symbol);
+		System.out.println(symbol.totalSize());
 		dataActivePointer += symbol.totalSize();
 	}
 	
 	private int collectInitializers(TokenStream line, int size) {
-	    int count = 0;
-	    while (!line.isAtEnd()) {
-	    	// constexpr everywhere!
-	        this.emitIntBE(Try.absorbAsm(
-	        	() -> foldExpression(line), 
-	        	line.peekNotNull()
-	        ), size);
-	        line.consumeIfMatch(TokenType.COMMA);
-	        count++;
-	    }
-	    return count;
+		int count = 0;
+		while (!line.isAtEnd()) {
+			// constexpr everywhere!
+			this.emitIntBE(Try.absorbAsm(() -> 
+				FL32RSpecs.requireFitBits(
+					size * 8, // size is in bytes
+					foldExpression(line)
+				), 
+				line.peekNotNull()
+			), size);
+			line.consumeIfMatch(TokenType.COMMA);
+			count++;
+		}
+		return count;
 	}
 	
 	private void emitIntBE(int value, int size) {

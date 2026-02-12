@@ -2,6 +2,8 @@ package dev.gkvn.cpu.assembler.fl32r.backend;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Arrays;
 
 import javax.swing.JFrame;
@@ -36,7 +38,7 @@ public class BackendCodegen {
 	private static final int HEIGHT = 480;
 	public void gen() throws IOException {
 		FL32REmulator emu = new FL32REmulator(Calc.GB(0.5));
-		emu.setFrequencyHz(1_000_000_000); // 1MHZ cpu
+		emu.setFrequencyHz(1_000_000); // 1MHZ cpu
 		this.cair.instructions().forEach(i -> {
 			var a = CodegenTable.getRuleFor(i.opcode);
 			if (a == null) {
@@ -53,6 +55,8 @@ public class BackendCodegen {
 		});
 		code.write(cair.dataSection().dataBytes());
 		System.out.println(Arrays.toString(code.toByteArray()));
+		
+		Files.write(Path.of("test.bin"), code.toByteArray());
 		
 		byte[] boot = code.toByteArray();
 //		for (int i = 0; i < text.length; i++) {

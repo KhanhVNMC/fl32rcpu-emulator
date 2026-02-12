@@ -72,9 +72,9 @@ public class CodegenTable {
 		entry(KILL,  noType(FL32RConstants.KILL));
 		
 		// pseudo-ops (Expand into one or more actual instructions)
-		entry(LD,   loadVariable());
-		entry(ST,   storeVariable());
-		entry(LDI,  loadImmediate());
+		entry(LD,    loadVariable());
+		entry(ST,    storeVariable());
+		entry(LDI,   loadImmediate());
 	}
 	
 	private static void entry(FEOpCode op, BiConsumer<BackendCodegen, Instruction> rule) {

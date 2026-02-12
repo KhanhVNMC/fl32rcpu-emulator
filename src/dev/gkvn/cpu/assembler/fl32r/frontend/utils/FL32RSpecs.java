@@ -52,7 +52,8 @@ public class FL32RSpecs {
 	
 	public static int requireFitBits(int bitWidth, int value) throws FrontendSolveError {
 		if (bitWidth <= 0 || bitWidth > 32) {
-			throw new IllegalArgumentException("Invalid bit width, how did you get here? Width: " + bitWidth);
+			// warn for when user do dum dum
+			throw new FrontendSolveError("Invalid numeric initializer! Initializer bit-width is smaller than element size (%d bits)", bitWidth);
 		}
 		if (bitWidth < 32) {
 			int mask = (1 << bitWidth) - 1;
