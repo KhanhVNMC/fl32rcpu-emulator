@@ -38,7 +38,7 @@ public class BackendCodegen {
 	private static final int HEIGHT = 480;
 	public void gen() throws IOException {
 		FL32REmulator emu = new FL32REmulator(Calc.GB(0.5));
-		emu.setFrequencyHz(1_000_000); // 1MHZ cpu
+		emu.setFrequencyHz(50_000_000); // 1MHZ cpu
 		this.cair.instructions().forEach(i -> {
 			var a = CodegenTable.getRuleFor(i.opcode);
 			if (a == null) {
@@ -54,8 +54,6 @@ public class BackendCodegen {
 			}
 		});
 		code.write(cair.dataSection().dataBytes());
-		System.out.println(Arrays.toString(code.toByteArray()));
-		
 		Files.write(Path.of("test.bin"), code.toByteArray());
 		
 		byte[] boot = code.toByteArray();
@@ -81,5 +79,6 @@ public class BackendCodegen {
 		for (int i = 0; i < reg.length; i++) {
 			System.out.println("R" + i + ": 0x" + Integer.toHexString(reg[i]) + " | " + Integer.toUnsignedLong(reg[i]));
 		}
+		Files.write(Path.of("dump.bin"), emu.dumpMemory().inner.chunks[0]);
 	}
 }

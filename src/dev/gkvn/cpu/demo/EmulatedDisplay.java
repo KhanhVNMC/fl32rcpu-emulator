@@ -34,7 +34,7 @@ public class EmulatedDisplay extends JPanel implements Runnable {
 			throw new RuntimeException("cannot do this, need at least: " + vramSize + " bytes of ram");
 		}
 		this.vramOffset = (int) (ramSize - vramSize); // leave 1 byte at the top of VRAM for buffer idnexing
-		((FL32REmulator) emu).randomize(vramOffset + 1);
+		//((FL32REmulator) emu).randomize(vramOffset + 1);
 		System.out.println(vramOffset);
 		javaBuffer = new BufferedImage(WIDTH, HEIGHT, BufferedImage.TYPE_INT_RGB);
 	}
@@ -49,19 +49,19 @@ public class EmulatedDisplay extends JPanel implements Runnable {
 	private void updateBuffer() {
 		ReadOnlyByteMemory memory = emu.dumpMemory();
 		this.currentBuffer = 0;
-		int pixelIndex = 0;
+		int base = vramOffset + 1 + currentBuffer * WIDTH * HEIGHT * 4;
 		for (int y = 0; y < HEIGHT; y++) {
 			for (int x = 0; x < WIDTH; x++) {
-				long addr = vramOffset + 1 + (currentBuffer == 0 ? 0 : WIDTH * HEIGHT * 4) + (pixelIndex * 4); // 3 bytes per pixel (RGB)
+				int index = y * WIDTH + x;
+				long addr = base + (index * 4); // 4 bytes per pixel (RGB)
 				if (addr + 3 >= memory.length()) {
 					break;
 				}
-				int r = Byte.toUnsignedInt(memory.get(addr));
-				int g = Byte.toUnsignedInt(memory.get(addr + 1));
-				int b = Byte.toUnsignedInt(memory.get(addr + 2));
+				int r = Byte.toUnsignedInt(memory.get(addr + 1));
+				int g = Byte.toUnsignedInt(memory.get(addr + 2));
+				int b = Byte.toUnsignedInt(memory.get(addr + 3));
 				int rgb = (r << 16) | (g << 8) | b;
 				javaBuffer.setRGB(x, y, rgb);
-				pixelIndex++;
 			}
 		}
 	}

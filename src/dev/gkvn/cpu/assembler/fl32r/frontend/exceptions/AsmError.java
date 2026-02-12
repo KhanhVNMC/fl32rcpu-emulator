@@ -9,4 +9,8 @@ public class AsmError extends RuntimeException {
         super(message);
         this.token = token;
     }
+    
+    public AsmError(Token token, String message, Object... fmt) {
+        this(String.format(message, fmt), token);
+    }
 }

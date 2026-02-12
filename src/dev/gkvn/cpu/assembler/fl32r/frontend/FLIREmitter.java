@@ -4,6 +4,8 @@ import static dev.gkvn.cpu.assembler.fl32r.frontend.utils.ConstantFolder.*;
 import static dev.gkvn.cpu.assembler.fl32r.frontend.utils.FL32RSpecs.*;
 
 import java.io.ByteArrayOutputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -16,7 +18,6 @@ import dev.gkvn.cpu.assembler.fl32r.frontend.core.Instruction;
 import dev.gkvn.cpu.assembler.fl32r.frontend.core.LabelText;
 import dev.gkvn.cpu.assembler.fl32r.frontend.core.ParsingContext;
 import dev.gkvn.cpu.assembler.fl32r.frontend.exceptions.AsmError;
-import dev.gkvn.cpu.assembler.fl32r.frontend.exceptions.FrontendSolveError;
 import dev.gkvn.cpu.assembler.fl32r.frontend.lexer.AsmLexer;
 import dev.gkvn.cpu.assembler.fl32r.frontend.lexer.Token;
 import dev.gkvn.cpu.assembler.fl32r.frontend.lexer.TokenType;
@@ -44,7 +45,8 @@ public class FLIREmitter {
 		TYPE_HW_ALIAS = ".hword",
 		TYPE_WORD = ".word",
 		TYPE_STRING = ".ascii",
-		TYPE_NT_STRING = ".asciz"
+		TYPE_NT_STRING = ".asciz",
+		TYPE_EXTERNAL_BLOB = ".blob"
 	;
 	
 	// internal backed data structs
@@ -142,9 +144,9 @@ public class FLIREmitter {
 		}
 		String name = nameTok.literal();
 		if (dataSymbols.containsKey(name)) {
-			throw new AsmError(
-				"Data symbol '" + name + "' already defined at line " + dataSymbols.get(name).owner().line(),
-				nameTok
+			throw new AsmError(nameTok,
+				"Data symbol '%s' already defined on line %d",
+				dataSymbols.get(name).owner().line()
 			);
 		}
 		Token dirTok = line.advance();
@@ -202,9 +204,9 @@ public class FLIREmitter {
 			case TYPE_STRING, TYPE_NT_STRING -> {
 				Token strToken = line.advance();
 				if (strToken.type() != TokenType.STRING) {
-					throw new AsmError(
-						".asciz/.ascii expects a string literal", 
-						strToken
+					throw new AsmError(strToken,
+						"%s/%s expects a string literal", 
+						TYPE_STRING, TYPE_NT_STRING
 					);
 				}
 				// remove the '""'
@@ -218,6 +220,27 @@ public class FLIREmitter {
 				}
 				if (isAsciiz) {
 					emitIntBE('\0', elementSize); // term byte 
+				}
+			}
+			case TYPE_EXTERNAL_BLOB -> {
+				Token filePath = line.advance();
+				if (filePath.type() != TokenType.STRING) {
+					throw new AsmError(filePath,
+						"%s expects a string for file path", 
+						TYPE_EXTERNAL_BLOB
+					);
+				}
+				// remove the '""'
+				String path = filePath.literal().substring(1, filePath.literal().length() - 1);
+				// read file
+				elementSize = 1;
+				try {
+					byte[] blob = Files.readAllBytes(Path.of(path));
+					elementCount = blob.length;
+					// emit the data
+					dataSectionBytes.write(blob);
+				} catch (Exception e) {
+					throw new AsmError(filePath, "Failed to read external blob file '%s': %s", path, e.getMessage());
 				}
 			}
 			default -> throw new AsmError(
@@ -234,7 +257,6 @@ public class FLIREmitter {
 			nameTok
 		);
 		dataSymbols.put(name, symbol);
-		System.out.println(symbol.totalSize());
 		dataActivePointer += symbol.totalSize();
 	}
 	
@@ -374,6 +396,7 @@ public class FLIREmitter {
 							"Expected a closing ']' in variable offset operand!"
 						), bracket.peekNotNull());
 					}
+					// a variable is always pc relative, regardless
 					yield new ImmVariable(
 						varName, 
 						offset, 
@@ -485,7 +508,8 @@ public class FLIREmitter {
 			int execPC = resolvePC + instruction.getSize(); // PC after fetch
 			var operands = instruction.operands;
 			for (int i = 0; i < operands.length; ++i) {
-				Operand operand = operands[i];
+				var operand = operands[i];
+				var operandType = instruction.opcode.getOperandKinds()[i];
 				// dissolve labels
 				if (operand instanceof ImmLabel ilabel) {
 					String labelStr = ilabel.label();
@@ -525,18 +549,11 @@ public class FLIREmitter {
 						);
 					}
 					int elemOffset = (collectPC + symbol.addressOffset()) + ivar.offset() * symbol.elementSize();
-					// you can do non memory (sto/load) with a variable, like: "ADDI R0, $variable" 
-					// its OK!, $variable is then treated as just a label (a pointer)
-					if (!ivar.pcRelative()) {
-						operands[i] = new ImmLiteral(Try.absorbAsm(() -> 
-							requireFitBits(
-								ivar.expectedBitWidth(), 
-								elemOffset
-							),
-							ivar.owner()
-						));
-					} else {
-						// compute the pc relative for actual pc rel operands
+					// note: only allow to dissolve to a memory operand
+					// if the operand type is a real "variable"
+					// ex: LD  R0, $variable
+					if (operandType == FEOperandType.VARIABLE && ivar.pcRelative()) {
+						// compute the pc relative for actual pc rel operands (and variable)
 						int pcRelOffset = elemOffset - execPC;
 						operands[i] = new SizedMemoryOperand(
 							new MemoryOperand(
@@ -545,6 +562,30 @@ public class FLIREmitter {
 							),
 							symbol.elementSize()
 						);
+					} else if (ivar.pcRelative()) { 
+						// not variable optype BUT still pc rel, we just
+						// dissolve into the same code as a label would
+						// ex: JMP $variable ; what
+						int pcRelOffset = elemOffset - execPC;
+						operands[i] = new ImmLiteral(Try.absorbAsm(() -> 
+							requireFitBits(
+								ivar.expectedBitWidth(), 
+								pcRelOffset
+							),
+							ivar.owner()
+						));
+					} else {
+						// you can do non variable ops with a variable, 
+						// like: "ADDI R0, $variable" 
+						// its OK!, $variable is then treated as just a label (resolve
+						// absolute address)
+						operands[i] = new ImmLiteral(Try.absorbAsm(() -> 
+							requireFitBits(
+								ivar.expectedBitWidth(), 
+								elemOffset
+							),
+							ivar.owner()
+						));
 					}
 				}
 			}

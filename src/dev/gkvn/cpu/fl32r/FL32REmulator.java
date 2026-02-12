@@ -355,7 +355,7 @@ public class FL32REmulator implements GenericCPUEmulator {
 			// store a word: Memory[rMemDest...3] = rSrc
 			case STW: {
 				// disambiguation
-				int rSrc = rDest, baseAddress = readRegister(rOp1);
+				int rSrc = rOp0, baseAddress = readRegister(rOp1);
 				int offset = Utils.convertImm14ToInt(operand & 0x3FFF);
 				writeWordMemory(baseAddress + offset, readRegister(rSrc));
 				break;

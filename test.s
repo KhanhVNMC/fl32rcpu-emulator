@@ -1,39 +1,32 @@
 @data
-vramOffset  .size(4) 534413312 ; .word is Ok too
-bytes       .size(1) 0xFF
+vramBufferSelect    .word 534413311
+vramFrontBuffer     .word 534413311 + 1
+vramBackBuffer      .word 534413311 + 1 + ((640 * 480) * 4)
+badapple            .blob "apple.bin"
+end                 .size(0)
+
 @text
-; this is a long block of comment
-; it has no problems because its ignored
+JMP main
+;JMP debug
 
-test2:
-    LD   RAX, $bytes[2]
-    JMP  ok
-
+debug:
+    LD     RBX, $vramFrontBuffer
+    LD     RAX, $badapple
+    STW    [RBX], RAX
+    KILL
 main:
-    LDI  RAX, $vramOffset
-    LDW  RBX, [RAX]
-    LD   RCX, $vramOffset[0]
-    CMP  RBX, RCX
-    JEQ  ok
-    JMP  notok
-ok:
-    LDI  R8, 1
-    KILL
-notok:
-    LDI  R8, 0
-    KILL
-
-start:
-    ;hi
-    LD    R2, $vramOffset   ; comment supported
+    LDI  RAX, $end
+    LDI  RBX, $badapple
+    SUB  RDX, RAX, RBX  ; RDX = length
+    LD   RAX, $vramFrontBuffer ; RAX = vramPointer
+    LDI  RBX, $badapple        ; RBX = imagePointer
+    MOV  RCX, R0 ; counter
 loop:
-    ADDI  R1, 0xFA
-    ADDI  R2, 4
-    CMP   R2, RSP
-    JLE   loop
+    LDW  R5, [RBX]
+    STW  [RAX], R5
+    ADDI RAX, 4  ; rax++
+    ADDI RBX, 4
+    ADDI RCX, 4
+    CMP  RCX, RDX ; if (rax < rdx) loop;
+    JLT  loop
     KILL
-skip:
-    MOV   R8, RPC
-    KILL
-
-switchBuffer:

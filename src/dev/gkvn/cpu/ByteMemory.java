@@ -2,7 +2,7 @@ package dev.gkvn.cpu;
 
 public class ByteMemory {
 	private static final int CHUNK_SIZE = 1 << 30; // 1 gb per chunk
-	private final byte[][] chunks;
+	public final byte[][] chunks;
 	private final long length;
 	
 	public ByteMemory(long size) {

@@ -23,7 +23,7 @@ public class CodegenTable {
 		entry(LUI,   uType(FL32RConstants.LUI));
 		entry(LLI,   uType(FL32RConstants.LLI));
 		entry(LDW,   mType(FL32RConstants.LDW));
-		entry(LDB,   mType(FL32RConstants.LDW));
+		entry(LDB,   mType(FL32RConstants.LDB));
 		entry(STW,   mType(FL32RConstants.STW));
 		entry(STB,   mType(FL32RConstants.STB));
 		
