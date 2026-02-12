@@ -16,8 +16,8 @@ import java.awt.image.BufferedImage;
 
 public class EmulatedDisplay extends JPanel implements Runnable {
 	private static final long serialVersionUID = 1L;
-	private static final int WIDTH = 640;
-	private static final int HEIGHT = 480;
+	private static final int WIDTH = 160;
+	private static final int HEIGHT = 120;
 
 	private final GenericCPUEmulator emu;
 	private final BufferedImage javaBuffer;
@@ -34,7 +34,7 @@ public class EmulatedDisplay extends JPanel implements Runnable {
 			throw new RuntimeException("cannot do this, need at least: " + vramSize + " bytes of ram");
 		}
 		this.vramOffset = (int) (ramSize - vramSize); // leave 1 byte at the top of VRAM for buffer idnexing
-		//((FL32REmulator) emu).randomize(vramOffset + 1);
+		((FL32REmulator) emu).randomize(vramOffset + 1);
 		System.out.println(vramOffset);
 		javaBuffer = new BufferedImage(WIDTH, HEIGHT, BufferedImage.TYPE_INT_RGB);
 	}
@@ -42,8 +42,9 @@ public class EmulatedDisplay extends JPanel implements Runnable {
 	@Override
 	protected void paintComponent(Graphics g) {
 		super.paintComponent(g);
-		// draw current buffer
-		g.drawImage(javaBuffer, 0, 0, null);
+		int w = getWidth();
+		int h = getHeight();
+		g.drawImage(javaBuffer, 0, 0, w, h, null);
 	}
 	
 	private void updateBuffer() {
