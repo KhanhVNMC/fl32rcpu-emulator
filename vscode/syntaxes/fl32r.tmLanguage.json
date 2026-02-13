@@ -3,7 +3,7 @@
   "name": "FL32R Assembly",
   "patterns": [
     {
-      "name": "meta.section.fl32r",
+      "name": "support.type",
       "match": "@(data|text)\\b"
     },
 
