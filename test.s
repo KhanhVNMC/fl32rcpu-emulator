@@ -3,7 +3,8 @@
 vramBufferSelect    .word 1073588223
 vramFrontBuffer     .word 1073588223 + 1
 ;vramBackBuffer      .word 1073588223 + 1 + ((640 * 480) * 4)
-badapple            .blob "junk/badapple-video.bin"
+;badapple            .blob "junk/badapple-video.bin"
+badapple            .size(36)
 end                 .size(0)
 @text
 ;JMP main
@@ -15,6 +16,7 @@ debug:
     JEQ  ok
     JMP  notok
 ok:
+    INT  0x50
     LDI  RCX, 1
     KILL
 notok:

@@ -37,14 +37,14 @@ public class BackendCodegen {
 	private static final int WIDTH = 640;
 	private static final int HEIGHT = 480;
 	public void gen() throws IOException {
-		FL32REmulator emu = new FL32REmulator(Calc.GB(1));
+		FL32REmulator emu = new FL32REmulator(Calc.GB(0.5));
 		emu.setFrequencyHz(12_000_000); // 1MHZ cpu
 		this.cair.instructions().forEach(i -> {
 			var a = CodegenTable.getRuleFor(i.opcode);
 			if (a == null) {
 				System.out.print(i + " -> ");
 				System.out.println("unimplemented");
-				return;
+				throw new RuntimeException("unimpl");
 			}
 			System.out.print(i + " -> ");
 			try {

@@ -84,7 +84,7 @@ public class FL32REmulator implements GenericCPUEmulator {
 		// setup the boot process
 		Arrays.fill(this.registers, 0x00); // fill regs with default values
 		this.HLP = true; // always start at the highest privilege level
-		writeRegister(REG_PROGRAM_COUNTER, 0x0);
+		writeRegister(REG_PROGRAM_COUNTER, 0x0); // TODO move to MMIO
 		writeRegister(REG_STACK_POINTER, (int)((memory.length() - 1) & 0xFFFFFFFFL));
 		this.bootProgramLoaded = true;
 	}
@@ -532,6 +532,11 @@ public class FL32REmulator implements GenericCPUEmulator {
 				writeRegister(REG_PROGRAM_COUNTER, popFromStack());
 				break;
 			}
+			// INT (interrupt)
+			case INT: {
+				softwareIRQ(Utils.convertImm24ToInt(operand));
+				break;
+			}
 			// HLP INSTRUCTIONS (Executed by the Kernel/HLP entities)
 			case VMO: {
 				// should use HR(x) (Host-Level Privilege dedicated APRs)
@@ -618,7 +623,7 @@ public class FL32REmulator implements GenericCPUEmulator {
 	 */
 	final int raiseFault(FaultType faultType) {
 		// enters the trap
-		enterTrap(switch (faultType) {
+		int toEnter = switch (faultType) {
 			case FAULT_MEM -> FAULT_MEM_VECTOR;
 			case FAULT_ILLEGAL -> FAULT_ILLEGAL_VECTOR;
 			case FAULT_DIVZERO -> FAULT_DIVZERO_VECTOR;
@@ -626,7 +631,12 @@ public class FL32REmulator implements GenericCPUEmulator {
 			case FAULT_STACK_UNDERFLOW -> FAULT_STACK_UNDERFLOW_VECTOR;
 			case FAULT_OVERFLOW -> FAULT_OVERFLOW_VECTOR;
 			default -> throw new RuntimeException("Emulator not up to spec!"); 
-		}, false);
+		};
+		System.out.printf("FAULT: %s, pc=0x%X, fault handler at 0x%X &(0x%X)", 
+			faultType, readRegister(REG_PROGRAM_COUNTER) - 4, toEnter,
+			readWordMemory(toEnter)
+		);
+		enterTrap(toEnter, false);
 		// abuse jvm exception latching
 		throw new FaultRaisedException(); // interrupts current execute() (latch)
 	}

@@ -58,10 +58,16 @@ public enum FEOpCode {
 	JR    (1, REG),
 	
 	RET	  (1),
+	INT	  (1, IMM24_ABS),
 	
 	VMO   (1, REG),
 	VMB   (1, REG),
 	HLR   (1, REG),
+	STI   (1),
+	CLI   (1),
+	GTFS  (1, REG),
+	GTPC  (1, REG),
+	STFS  (1, REG),
 	
 	NOP   (1),
 	HLT   (1),

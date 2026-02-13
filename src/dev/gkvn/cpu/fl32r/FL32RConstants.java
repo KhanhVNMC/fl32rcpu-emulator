@@ -59,6 +59,9 @@ public class FL32RConstants {
 		CLR  = 0x3C, // CALL a function from an address in register (rAddr, like JR)
 		RET  = 0x3D, // RETURN by popping the stack and JUMP ABSOLUTE there
 		
+		// interrupts
+		INT  = 0x60, // software interrupt
+		
 		// MEMORY MANAGEMENT/CPU STATE (privileged instructions starts with 0x5)
 		/*
 		 * Virtual Memory (VMEM) - Brief Documentation
@@ -121,12 +124,12 @@ public class FL32RConstants {
 		
 		// software/hardware interrupts
 		SOFTWARE_INT_BASE = BREAKPOINT_VECTOR + WORD_SIZE,
-		SOFTWARE_INT_COUNT = 24,
+		SOFTWARE_INT_COUNT = 40,
 		SOFTWARE_INT_END = (SOFTWARE_INT_BASE + (WORD_SIZE * SOFTWARE_INT_COUNT)) - WORD_SIZE,
 		
 		// hardware interrupts
 		HARDWARE_INT_BASE = SOFTWARE_INT_END + WORD_SIZE,
-		HARDWARE_INT_COUNT = 25,
+		HARDWARE_INT_COUNT = 12,
 		HARDWARE_INT_END = HARDWARE_INT_BASE + (WORD_SIZE * HARDWARE_INT_COUNT) - WORD_SIZE;
 	;
 }
