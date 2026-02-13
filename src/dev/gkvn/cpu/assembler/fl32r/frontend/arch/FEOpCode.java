@@ -71,6 +71,7 @@ public enum FEOpCode {
 	LDI   (2, REG, IMM32_ABS),
 	LD    (1, REG, VARIABLE),
 	ST    (1, VARIABLE, REG),
+	LEA   (2, REG, VARIABLE),
 	;
 	
 	// cunt

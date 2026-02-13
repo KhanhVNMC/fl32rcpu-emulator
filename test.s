@@ -1,3 +1,4 @@
+#pragma BOOT_CODE align(0x0000)
 @data
 vramBufferSelect    .word 1073588223
 vramFrontBuffer     .word 1073588223 + 1
@@ -5,13 +6,19 @@ vramFrontBuffer     .word 1073588223 + 1
 badapple            .blob "junk/badapple-video.bin"
 end                 .size(0)
 @text
-JMP main
-;JMP debug
-
+;JMP main
+JMP debug
 debug:
-    LD     RBX, $vramFrontBuffer
-    LD     RAX, $badapple
-    STW    [RBX], RAX
+    LDI  RAX, $badapple
+    LEA  RBX, $badapple
+    CMP  RAX, RBX
+    JEQ  ok
+    JMP  notok
+ok:
+    LDI  RCX, 1
+    KILL
+notok:
+    LDI  RCX, 0
     KILL
 main:
     LDI  RAX, $end

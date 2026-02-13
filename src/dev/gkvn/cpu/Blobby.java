@@ -29,8 +29,7 @@ public class Blobby {
 			int read = 0;
 			while (read < FRAME_BYTES) {
 				int r = in.read(rgb, read, FRAME_BYTES - read);
-				if (r < 0)
-					break;
+				if (r < 0) break;
 				read += r;
 			}
 			if (read < FRAME_BYTES) {

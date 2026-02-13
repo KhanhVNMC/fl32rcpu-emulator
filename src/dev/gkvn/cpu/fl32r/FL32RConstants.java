@@ -1,6 +1,8 @@
 package dev.gkvn.cpu.fl32r;
 
 public class FL32RConstants {
+	public static final int WORD_SIZE = 4;
+	
 	// a word is 32-bit
 	public static final byte // INSTRUCTIONS
 		// DATA controls
@@ -76,6 +78,11 @@ public class FL32RConstants {
 		
 		// SPECIALS
 		HLR  = 0x52, // de-escalation, clear HLR and return to the address on the register
+		STI  = 0x53, // allow interrupts to happen (SeT Interrupt flag
+		CLI  = 0x54, // disallow interrupts (CLear Interrupt flag)
+		GTFS = 0x55, // copy IFR (interrupt flags register) to a GPR
+		GTPC = 0x56, // copy IPR (interrupt program counter register) to a GPR
+		STFS = 0x57, // set the current cpu flags to a packed value in a register
 		NOP  = 0x00, // no-op
 		HLT  = 0x7A, // halt the cpu
 		KILL = 0x7B // kill the cpu and print debug (EMU ONLY), like HLT on FL516, on real HW, this is NO-OP
@@ -92,5 +99,34 @@ public class FL32RConstants {
 		REG_HLP_APR1 = 29, // all-purpose-register
 		REG_HLP_APR2 = 30,
 		REG_HLP_APR3 = 31
+	;
+	
+	public static final int UNDEFINED_VECTOR = 0x0;
+	
+	public static final int // interrupt/fault vectors
+		// core vectors
+		RESET_VECTOR = 0x00,
+		PANIC_VECTOR = 0x04,
+		UNHANDLED_INTERRUPT_VECTOR = 0x08,
+		
+		// faults
+		FAULT_MEM_VECTOR = 0x0C,
+		FAULT_PRIV_VECTOR = 0x10,
+		FAULT_ILLEGAL_VECTOR = 0x14,
+		FAULT_DIVZERO_VECTOR = 0x18,
+		FAULT_STACK_OVERFLOW_VECTOR = 0x1C,
+		FAULT_STACK_UNDERFLOW_VECTOR = 0x20,
+		FAULT_OVERFLOW_VECTOR = 0x24,
+		BREAKPOINT_VECTOR = 0x28,
+		
+		// software/hardware interrupts
+		SOFTWARE_INT_BASE = BREAKPOINT_VECTOR + WORD_SIZE,
+		SOFTWARE_INT_COUNT = 24,
+		SOFTWARE_INT_END = (SOFTWARE_INT_BASE + (WORD_SIZE * SOFTWARE_INT_COUNT)) - WORD_SIZE,
+		
+		// hardware interrupts
+		HARDWARE_INT_BASE = SOFTWARE_INT_END + WORD_SIZE,
+		HARDWARE_INT_COUNT = 25,
+		HARDWARE_INT_END = HARDWARE_INT_BASE + (WORD_SIZE * HARDWARE_INT_COUNT) - WORD_SIZE;
 	;
 }

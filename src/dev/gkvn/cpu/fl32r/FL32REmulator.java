@@ -28,6 +28,8 @@ public class FL32REmulator implements GenericCPUEmulator {
 	
 	// cpu internal states
 	private boolean cpuHalted = false;
+	private int IPR = 0, IFR = 0; // interrupt saved program counter and flag (return)
+	private boolean interruptMask = false; // mask == int not allowed
 	
 	// emulator parameter/controls
 	private double nsPerCycle;
@@ -92,6 +94,14 @@ public class FL32REmulator implements GenericCPUEmulator {
 		for (int i = startAt; i < memory.length(); i++) {
 			memory.set(i, (byte) (r.nextInt(0, 255) & 0xFF));
 		}
+	}
+	
+	/**
+	 * @return the current working memory, mutating it will
+	 * change the state of the emulator
+	 */
+	public ByteMemory getWorkingMemory() {
+		return this.memory;
 	}
 	
 	// MAIN CPU LOOP
@@ -206,7 +216,9 @@ public class FL32REmulator implements GenericCPUEmulator {
 					while (System.nanoTime() < spinUntil) {} // spin wait
 				}
 			}
-		} catch (FaultRaisedException ignored) {}
+		} catch (FaultRaisedException ignored) {
+			// dont catch this
+		} // runtime exception will throw immediately, crashing the entire emulator (as it should)
 	}
 	
 	/**
@@ -249,8 +261,8 @@ public class FL32REmulator implements GenericCPUEmulator {
 		this.NFL = false;
 		this.OFL = false;
 		this.HLP = true; // start in the highest level privilege
-		// jump to the post-reset vector, 0x0 for now
-		writeRegister(REG_PROGRAM_COUNTER, 0x0); // reset vector (0x0 for now)
+		// jump to the VALUE of reset vector (at 0x0)
+		writeRegister(REG_PROGRAM_COUNTER, readWordMemory(RESET_VECTOR));
 		// put the stack pointer to the initial position
 		writeRegister(REG_STACK_POINTER, (int)((memory.length() - 1) & 0xFFFFFFFFL));
 		if (resetToSingleStepMode) {
@@ -549,6 +561,39 @@ public class FL32REmulator implements GenericCPUEmulator {
 				writeRegister(REG_PROGRAM_COUNTER, resumeAddress); // and return to the address
 				break;
 			}
+			// copy IFR into a general purpose reg
+			case GTFS: {
+				if (!this.HLP) raiseFault(FaultType.FAULT_PRIV);
+				writeRegister(rDest, this.IFR);
+				break;
+			}
+			// set the flags according to a gpr
+			case STFS: {
+				if (!this.HLP) raiseFault(FaultType.FAULT_PRIV);
+				int packedFlags = readRegister(rOp1);
+				this.ZFL = (packedFlags & Utils.FLAG_Z) == 1;
+				this.NFL = (packedFlags & Utils.FLAG_N) == 1;
+				this.OFL = (packedFlags & Utils.FLAG_O) == 1;
+				break;
+			}
+			// copy IPR into a general purpose reg
+			case GTPC: {
+				if (!this.HLP) raiseFault(FaultType.FAULT_PRIV);
+				writeRegister(rDest, this.IPR);
+				break;
+			}
+			// allow for interrupts
+			case STI: {
+				if (!this.HLP) raiseFault(FaultType.FAULT_PRIV);
+				this.interruptMask = false;
+				break;
+			}
+			// disallow interrupts
+			case CLI: {
+				if (!this.HLP) raiseFault(FaultType.FAULT_PRIV);
+				this.interruptMask = true;
+				break;
+			}
 			// Halt the cpu until an interrupt happens
 			case HLT: {
 				if (!this.HLP) raiseFault(FaultType.FAULT_PRIV);
@@ -572,12 +617,69 @@ public class FL32REmulator implements GenericCPUEmulator {
 	 * This function is called whenever there's a violation (fault) during a cycle
 	 */
 	final int raiseFault(FaultType faultType) {
-		// halt the CPU and may be in the future, 
-		// jump to a vector table and escalate back to HLP
-		this.halt();
-		System.out.println("CPU AT FAULT:" + faultType + " PC: " + Integer.toUnsignedString(readRegister(REG_PROGRAM_COUNTER)));
-		// TODO
-		throw new FaultRaisedException(); // interrupts current execute()
+		// enters the trap
+		enterTrap(switch (faultType) {
+			case FAULT_MEM -> FAULT_MEM_VECTOR;
+			case FAULT_ILLEGAL -> FAULT_ILLEGAL_VECTOR;
+			case FAULT_DIVZERO -> FAULT_DIVZERO_VECTOR;
+			case FAULT_STACK_OVERFLOW -> FAULT_STACK_OVERFLOW_VECTOR;
+			case FAULT_STACK_UNDERFLOW -> FAULT_STACK_UNDERFLOW_VECTOR;
+			case FAULT_OVERFLOW -> FAULT_OVERFLOW_VECTOR;
+			default -> throw new RuntimeException("Emulator not up to spec!"); 
+		}, false);
+		// abuse jvm exception latching
+		throw new FaultRaisedException(); // interrupts current execute() (latch)
+	}
+	
+	// CPU INTERRUPTS/TRAP HANDLE
+	final void softwareIRQ(int type) {
+		if (type < 0 || type >= SOFTWARE_INT_COUNT) {
+			raiseFault(FaultType.FAULT_ILLEGAL);
+			return;
+		}
+		// trap the interrupt
+		enterTrap(SOFTWARE_INT_BASE + (WORD_SIZE * type), true);
+	}
+	
+	public final void hardwareIRQ(int type) {
+		if (type < 0 || type >= HARDWARE_INT_COUNT) {
+			enterTrap(UNHANDLED_INTERRUPT_VECTOR, true);
+			return;
+		}
+		// trap the interrupt
+		enterTrap(HARDWARE_INT_BASE + (WORD_SIZE * type), true);
+	}
+	
+	final void enterTrap(int vectorAddress, boolean isInterrupt) {
+		// if its already in HLP and a fault fires, you are cooked
+		if (this.HLP && !isInterrupt) {
+			vectorAddress = PANIC_VECTOR; // panic
+		}
+		if (isInterrupt && interruptMask) {
+			return; // ignore
+		}
+		this.IPR = readRegister(REG_PROGRAM_COUNTER);
+		this.IFR = Utils.packFlags(ZFL, NFL, OFL);
+		this.HLP = true;
+		this.interruptMask = true; // do not allow interrupts from now on
+		// resume to the full memory region (at 0x0000-HIMEM)
+		writeRegister(REG_VMEM_OFFSET, 0x0);
+		writeRegister(REG_VMEM_MAX_BOUND, 0x0);
+		// jump to interrupt handle (HLP)
+		int irqHandleAddress = readWordMemory(vectorAddress);
+		if (irqHandleAddress == UNDEFINED_VECTOR) {
+			switch (vectorAddress) {
+				case RESET_VECTOR: // if the reset vector is missing, how the fuck did you end up here anyway
+				case PANIC_VECTOR:
+				case UNHANDLED_INTERRUPT_VECTOR: {
+					throw new RuntimeException("Critical vector missing: " + vectorAddress);
+				}
+				default: {
+					irqHandleAddress = isInterrupt ? UNHANDLED_INTERRUPT_VECTOR : PANIC_VECTOR;
+				}
+			}
+		}
+		writeRegister(REG_PROGRAM_COUNTER, irqHandleAddress);
 	}
 	
 	// REGISTER MANIPULATION

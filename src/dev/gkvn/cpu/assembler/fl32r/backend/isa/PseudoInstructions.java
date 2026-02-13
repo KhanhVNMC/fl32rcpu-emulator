@@ -74,4 +74,27 @@ public class PseudoInstructions {
 			));
 		};
 	}
+	
+	static BiConsumer<BackendCodegen, Instruction> loadEffectiveAddress() {
+		return (be, i) -> {
+			RegisterOperand rop = (RegisterOperand) i.operands[0];
+			SizedMemoryOperand mop = (SizedMemoryOperand) i.operands[1];
+			
+			int reg = rop.register();
+			// emit the MOV (pc)
+			be.emit(R(FL32RConstants.MOV, reg, FL32RConstants.REG_PROGRAM_COUNTER, 0));
+			// note: since this is a pseudo-op and PC relative 
+			// memop().offset() will resolve to the topmost instruction that "represent"
+			// this cluster (aka the anchor instruction)
+			
+			// in this case, we expand by 2, so add +4 to the lower one
+			// > PSEUDO $variable 
+			// expands to
+			// > REAL  ... << the anchor of this one
+			// > REAL2 ...
+			be.emit(I(FL32RConstants.ADDI, reg, 
+				((ImmLiteral) mop.memop().offset()).value() + 4
+			));
+		};
+	}
 }

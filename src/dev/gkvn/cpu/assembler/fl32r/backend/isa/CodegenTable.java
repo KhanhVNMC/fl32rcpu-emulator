@@ -75,6 +75,7 @@ public class CodegenTable {
 		entry(LD,    loadVariable());
 		entry(ST,    storeVariable());
 		entry(LDI,   loadImmediate());
+		entry(LEA,   loadEffectiveAddress());
 	}
 	
 	private static void entry(FEOpCode op, BiConsumer<BackendCodegen, Instruction> rule) {

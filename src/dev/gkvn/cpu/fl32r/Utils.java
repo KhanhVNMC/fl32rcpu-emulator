@@ -1,6 +1,18 @@
 package dev.gkvn.cpu.fl32r;
 
 public class Utils {
+	public static final int FLAG_Z = 1 << 31;
+	public static final int FLAG_N = 1 << 30;
+	public static final int FLAG_O = 1 << 29;
+	
+	public static final int packFlags(boolean z, boolean n, boolean o) {
+		int flag = 0;
+		if (z) flag |= FLAG_Z;
+		if (n) flag |= FLAG_N;
+		if (o) flag |= FLAG_O;
+		return flag;
+	}
+	
 	public static final int beBytesToInt(byte b0, byte b1, byte b2, byte b3) {
 		return (b0 & 0xFF) << 24 | (b1 & 0xFF) << 16 | (b2 & 0xFF) << 8 | (b3 & 0xFF);
 	}

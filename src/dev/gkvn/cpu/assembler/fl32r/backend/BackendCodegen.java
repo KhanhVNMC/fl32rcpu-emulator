@@ -67,7 +67,7 @@ public class BackendCodegen {
 		emu.loadBootProgram(boot);
 		EmulatedDisplay screen = new EmulatedDisplay(emu);
 		
-		JFrame frame = new JFrame("CPU Display");
+		JFrame frame = new JFrame("FL32R CPU Display");
 		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		frame.setSize(WIDTH, HEIGHT);
 		frame.add(screen);
