@@ -1,0 +1,26 @@
+{
+    "name": "fl32r-asm-syntax",
+    "displayName": "FL32R Assembly",
+    "description": "VSCode syntax highlighting for the FL32R Microarchitecture Conventional Assembler",
+    "version": "0.1.0",
+    "publisher": "GiaKhanhVN",
+    "engines": { "vscode": "^1.80.0" },
+    "categories": ["Programming Languages"],
+    "contributes": {
+        "languages": [
+            {
+                "id": "fl32r",
+                "aliases": ["FL32R Assembly", "fl32r"],
+                "extensions": [".asm", ".s", ".l", ".fl32asm"],
+                "configuration": "./fl32r-configuration.json"
+            }
+        ],
+        "grammars": [
+            {
+                "language": "fl32r",
+                "scopeName": "source.fl32r",
+                "path": "./syntaxes/fl32r.tmLanguage.json"
+            }
+        ]
+    }
+}

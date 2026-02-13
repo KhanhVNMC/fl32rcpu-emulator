@@ -1,0 +1,55 @@
+{
+  "scopeName": "source.fl32r",
+  "name": "FL32R Assembly",
+  "patterns": [
+    {
+      "name": "meta.section.fl32r",
+      "match": "@(data|text)\\b"
+    },
+
+    {
+      "name": "keyword.control.fl32r",
+      "match": "(?i)\\b(MOV|LUI|LLI|LDW|LDB|STW|STB|ADD|SUB|MUL|UMUL|DIV|UDIV|MOD|UMOD|AND|OR|XOR|SHL|SHR|SRA|NOT|ADDI|ANDI|ORI|XORI|SHRI|SRAI|SHLI|PUSH|POP|CMP|JMP|JEQ|JNE|JLT|JGT|JGE|JLE|JOF|JNO|CALL|CLR|JR|RET|INT|VMO|VMB|HLR|STI|CLI|GTFS|GTPC|STFS|NOP|HLT|KILL|LDI|LD|ST|LEA)\\b"
+    },
+
+    {
+      "name": "variable.other.register.fl32r",
+      "match": "(?i)\\b(R([0-9]|1[0-9]|2[0-4])|RAX|RBX|RCX|RDX|RSP|RPC|RZ|RZERO|HMO|HMB|HM[1-3])\\b"
+    },
+
+    {
+      "name": "variable.other.symbol.fl32r",
+      "match": "\\$[A-Za-z_][A-Za-z0-9_]*"
+    },
+
+    {
+      "name": "constant.numeric.fl32r",
+      "match": "\\b(0x[0-9A-Fa-f]+|0b[01]+|\\d+)\\b"
+    },
+
+    {
+      "name": "storage.type.fl32r",
+      "match": "\\.(size|space|byte|half|hword|word|ascii|asciz|blob)\\b"
+    },
+
+    {
+      "name": "entity.name.label.fl32r",
+      "match": "^[A-Za-z_][A-Za-z0-9_]*:"
+    },
+
+    {
+      "name": "meta.brackets.fl32r",
+      "match": "\\[[^\\]]+\\]"
+    },
+
+    {
+      "name": "string.quoted.double.fl32r",
+      "match": "\"[^\"]*\""
+    },
+
+    {
+      "name": "comment.line.semicolon.fl32r",
+      "match": ";.*$"
+    }
+  ]
+}

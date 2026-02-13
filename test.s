@@ -1,4 +1,3 @@
-#pragma BOOT_CODE align(0x0000)
 @data
 vramBufferSelect    .word 1073588223
 vramFrontBuffer     .word 1073588223 + 1
@@ -16,7 +15,7 @@ debug:
     JEQ  ok
     JMP  notok
 ok:
-    INT  0x50
+    INT  0x50 ; here
     LDI  RCX, 1
     KILL
 notok:
