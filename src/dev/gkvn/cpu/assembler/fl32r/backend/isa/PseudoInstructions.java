@@ -78,7 +78,14 @@ public class PseudoInstructions {
 	static BiConsumer<BackendCodegen, Instruction> loadEffectiveAddress() {
 		return (be, i) -> {
 			RegisterOperand rop = (RegisterOperand) i.operands[0];
-			SizedMemoryOperand mop = (SizedMemoryOperand) i.operands[1];
+			ImmLiteral pcRelOffset;
+			if (i.operands[1] instanceof ImmLiteral il) {
+				pcRelOffset = il;
+			} else if (i.operands[1] instanceof SizedMemoryOperand smo)  {
+				pcRelOffset = ((ImmLiteral) smo.memop().offset());
+			} else {
+				throw new IllegalArgumentException("This is not supposed to happen! FRONTEND_FAULT. IR: " + i);
+			}
 			
 			int reg = rop.register();
 			// emit the MOV (pc)
@@ -93,7 +100,7 @@ public class PseudoInstructions {
 			// > REAL  ... << the anchor of this one
 			// > REAL2 ...
 			be.emit(I(FL32RConstants.ADDI, reg, 
-				((ImmLiteral) mop.memop().offset()).value() + 4
+				pcRelOffset.value() + 4
 			));
 		};
 	}

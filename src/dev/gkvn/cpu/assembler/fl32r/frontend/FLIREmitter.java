@@ -376,10 +376,27 @@ public class FLIREmitter {
 					);
 				}
 				// $var, $var[offset]
-				case VARIABLE: {
+				case VARIABLE:
+				// $var, $var[offset] or label
+				case VARIABLE_OR_LABEL: {
 					// this is for some shorthand pseudo-op
 					Token varToken = parsed.get(0);
 					if (varToken.type() != TokenType.VAR) {
+						if (expected == FEOperandType.VARIABLE_OR_LABEL) {
+							// special case for variable & label (accept a label too)
+							if (parsed.size() == 1 && varToken.type() == TokenType.IDENTIFIER) {
+								yield new ImmLabel(
+									varToken.literal(),
+									32, true, // max width & pc rel
+									varToken
+								);
+							}
+							throw new AsmError(
+								"Expected a defined variable/const or a label",
+								varToken
+							);
+						}
+						// normal case (not V&L)
 						throw new AsmError(
 							"Expected a defined variable/const",
 							varToken

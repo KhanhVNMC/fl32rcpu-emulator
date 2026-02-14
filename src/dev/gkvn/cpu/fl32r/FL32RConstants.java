@@ -104,11 +104,22 @@ public class FL32RConstants {
 		REG_HLP_APR3 = 31
 	;
 	
+	public static final int 
+		LOW_MEM_ADDRESS  = 0x00000000,
+		HIGH_MEM_ADDRESS = 0xFFFFFFFF,
+		ROM_SIZE = 1024 * 1024,
+		MMIO_REGION_SIZE = 512 * 1024 * 1024,
+			
+		MMIO_REGION_START = HIGH_MEM_ADDRESS - MMIO_REGION_SIZE + 1,
+		ROM_MMAP_START = HIGH_MEM_ADDRESS - MMIO_REGION_SIZE - ROM_SIZE,
+		RAM_WINDOW_END = ROM_MMAP_START - 1
+	;
+	
 	public static final int UNDEFINED_VECTOR = 0x0;
 	
 	public static final int // interrupt/fault vectors
 		// core vectors
-		RESET_VECTOR = 0x00,
+		CPU_PROBE_VECTOR = 0x00, // debugging
 		PANIC_VECTOR = 0x04,
 		UNHANDLED_INTERRUPT_VECTOR = 0x08,
 		

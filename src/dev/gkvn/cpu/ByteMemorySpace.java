@@ -1,11 +1,11 @@
 package dev.gkvn.cpu;
 
-public class ByteMemory {
+public class ByteMemorySpace {
 	private static final int CHUNK_SIZE = 1 << 30; // 1 gb per chunk
 	private final byte[][] chunks;
 	private final long length;
 	
-	public ByteMemory(long size) {
+	public ByteMemorySpace(long size) {
 		if (size < 0) {
 			throw new IllegalArgumentException("Size must be >= 0");
 		}

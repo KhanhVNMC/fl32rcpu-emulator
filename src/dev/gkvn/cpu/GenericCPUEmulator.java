@@ -190,7 +190,17 @@ public interface GenericCPUEmulator {
 	 * @return A read-only view of the emulator's entire memory space. Mutating the
 	 *         returned object must not affect emulator RAM.
 	 */
-	ReadOnlyByteMemory dumpMemory();
+	ImmutableByteSpace dumpMemory();
+	
+	/**
+	 * @return The emulator working memory
+	 */
+	ByteMemorySpace getMemory();
+	
+	/**
+	 * @return The emulator read only memory
+	 */
+	ByteMemorySpace getROM();
 
 	// === GETTER BULLSHIT ===
 

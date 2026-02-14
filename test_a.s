@@ -9,9 +9,6 @@ offset      .byte  97 - 'a' ; what
 ; this is a long block of comment
 ; it has no problems because its ignored
 
-nigga:
-    JMP nigga
-
 pseudoop_expanding:
     LD   RAX, $strings[0]
     LD   RBX, $strings[1]

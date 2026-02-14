@@ -4,7 +4,7 @@ import javax.swing.*;
 
 import dev.gkvn.cpu.Calc;
 import dev.gkvn.cpu.GenericCPUEmulator;
-import dev.gkvn.cpu.ReadOnlyByteMemory;
+import dev.gkvn.cpu.ImmutableByteSpace;
 import dev.gkvn.cpu.fl32r.FL32REmulator;
 import dev.gkvn.cpu.fl32r.Utils;
 
@@ -48,7 +48,7 @@ public class EmulatedDisplay extends JPanel implements Runnable {
 	}
 	
 	private void updateBuffer() {
-		ReadOnlyByteMemory memory = emu.dumpMemory();
+		ImmutableByteSpace memory = emu.dumpMemory();
 		this.currentBuffer = 0;
 		int base = vramOffset + 1 + currentBuffer * WIDTH * HEIGHT * 4;
 		for (int y = 0; y < HEIGHT; y++) {

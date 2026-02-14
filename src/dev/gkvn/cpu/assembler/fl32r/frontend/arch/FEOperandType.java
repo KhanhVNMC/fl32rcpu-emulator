@@ -11,6 +11,7 @@ public enum FEOperandType {
     IMM32_ABS(32, false),
     // SPECIAL type of MEMORY operand
     VARIABLE, // $variable (expands into a MEMORY operand, context dependent)
+    VARIABLE_OR_LABEL // accept only a label or a variable (LEA)
     ;
 	
 	public final int bitWidth;

@@ -1,9 +1,9 @@
 package dev.gkvn.cpu;
 
-public class ReadOnlyByteMemory {
-	private final ByteMemory inner;
+public class ImmutableByteSpace {
+	private final ByteMemorySpace inner;
 	
-	public ReadOnlyByteMemory(ByteMemory inner) {
+	public ImmutableByteSpace(ByteMemorySpace inner) {
 		this.inner = inner;
 	}
 	

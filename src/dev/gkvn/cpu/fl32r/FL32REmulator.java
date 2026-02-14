@@ -7,9 +7,9 @@ import java.util.HashSet;
 import java.util.Random;
 import java.util.Set;
 
-import dev.gkvn.cpu.ByteMemory;
+import dev.gkvn.cpu.ByteMemorySpace;
 import dev.gkvn.cpu.GenericCPUEmulator;
-import dev.gkvn.cpu.ReadOnlyByteMemory;
+import dev.gkvn.cpu.ImmutableByteSpace;
 
 // this CPU is BIG-ENDIAN, 32-bit processor with primitive MMU
 // FL32RCPU -> Fixed Length 32-bit RISC CPU
@@ -23,8 +23,10 @@ public class FL32REmulator implements GenericCPUEmulator {
 	private final int registers[] = new int[32]; // 32x 32 bits register
 	
 	// the CPU's memory (RAM)
-	private final ByteMemory memory;
-	private final ReadOnlyByteMemory readonlyMemory;
+	private final ByteMemorySpace memory;
+	
+	// the CPU's read only memory ROM
+	private final ByteMemorySpace readOnlyMemory;
 	
 	// cpu internal states
 	private boolean cpuHalted = false;
@@ -47,8 +49,8 @@ public class FL32REmulator implements GenericCPUEmulator {
 			throw new IllegalArgumentException("Memory size must be 0 -> 4GB");
 		}
 		this.setFrequencyHz(32_000_000); // 32 MHZ cpu
-		this.memory = new ByteMemory(memorySize);
-		this.readonlyMemory = new ReadOnlyByteMemory(this.memory);
+		this.memory = new ByteMemorySpace(memorySize);
+		this.readOnlyMemory = new ByteMemorySpace(1024); // 1 byte of ROM (for boot code)
 	}
 	
 	@Override
@@ -79,13 +81,8 @@ public class FL32REmulator implements GenericCPUEmulator {
 		}
 		// copy over the program to memory (0x0)
 		for (int i = 0; i < program.length; i++) {
-			memory.set(i, program[i]);
+			readOnlyMemory.set(i, program[i]);
 		}
-		// setup the boot process
-		Arrays.fill(this.registers, 0x00); // fill regs with default values
-		this.HLP = true; // always start at the highest privilege level
-		writeRegister(REG_PROGRAM_COUNTER, 0x0); // TODO move to MMIO
-		writeRegister(REG_STACK_POINTER, (int)((memory.length() - 1) & 0xFFFFFFFFL));
 		this.bootProgramLoaded = true;
 	}
 	
@@ -100,7 +97,7 @@ public class FL32REmulator implements GenericCPUEmulator {
 	 * @return the current working memory, mutating it will
 	 * change the state of the emulator
 	 */
-	public ByteMemory getWorkingMemory() {
+	public ByteMemorySpace getWorkingMemory() {
 		return this.memory;
 	}
 	
@@ -112,9 +109,8 @@ public class FL32REmulator implements GenericCPUEmulator {
 		}
 		this.cpuStarted = true;
 		// start the cpu halted and in single step mode, needs manual stepping
-		if (startInSingleStepMode && !this.singleStepMode) {
-			this.activateSingleStepMode();
-		}
+		this.reset(startInSingleStepMode);
+		
 		// autonomous execution
 		while (true) {
 			if (this.cpuKilled) break; // stop the cpu immediately (basically powered off)
@@ -261,10 +257,8 @@ public class FL32REmulator implements GenericCPUEmulator {
 		this.NFL = false;
 		this.OFL = false;
 		this.HLP = true; // start in the highest level privilege
-		// jump to the VALUE of reset vector (at 0x0)
-		writeRegister(REG_PROGRAM_COUNTER, readWordMemory(RESET_VECTOR));
-		// put the stack pointer to the initial position
-		writeRegister(REG_STACK_POINTER, (int)((memory.length() - 1) & 0xFFFFFFFFL));
+		// jump to the VALUE of reset vector (inside the ROM)
+		writeRegister(REG_PROGRAM_COUNTER, ROM_MMAP_START); 
 		if (resetToSingleStepMode) {
 			this.activateSingleStepMode();
 			return;
@@ -307,8 +301,18 @@ public class FL32REmulator implements GenericCPUEmulator {
 	}
 	
 	@Override
-	public ReadOnlyByteMemory dumpMemory() {
-		return this.readonlyMemory;
+	public ImmutableByteSpace dumpMemory() {
+		return new ImmutableByteSpace(this.memory);
+	}
+	
+	@Override
+	public ByteMemorySpace getMemory() {
+		return this.memory;
+	}
+	
+	@Override
+	public ByteMemorySpace getROM() {
+		return this.readOnlyMemory;
 	}
 	
 	@Override
@@ -632,11 +636,12 @@ public class FL32REmulator implements GenericCPUEmulator {
 			case FAULT_OVERFLOW -> FAULT_OVERFLOW_VECTOR;
 			default -> throw new RuntimeException("Emulator not up to spec!"); 
 		};
-		System.out.printf("FAULT: %s, pc=0x%X, fault handler at 0x%X &(0x%X)", 
+		System.out.printf("FAULT: %s, pc=0x%X, fault handler at 0x%X &(0x%X)\n", 
 			faultType, readRegister(REG_PROGRAM_COUNTER) - 4, toEnter,
 			readWordMemory(toEnter)
 		);
 		enterTrap(toEnter, false);
+		System.exit(1);
 		// abuse jvm exception latching
 		throw new FaultRaisedException(); // interrupts current execute() (latch)
 	}
@@ -673,13 +678,12 @@ public class FL32REmulator implements GenericCPUEmulator {
 		this.HLP = true;
 		this.interruptMask = true; // do not allow interrupts from now on
 		// resume to the full memory region (at 0x0000-HIMEM)
-		writeRegister(REG_VMEM_OFFSET, 0x0);
-		writeRegister(REG_VMEM_MAX_BOUND, 0x0);
+		writeRegister(REG_VMEM_OFFSET, 0x00);
+		writeRegister(REG_VMEM_MAX_BOUND, 0x00);
 		// jump to interrupt handle (HLP)
 		int irqHandleAddress = readWordMemory(vectorAddress);
 		if (irqHandleAddress == UNDEFINED_VECTOR) {
 			switch (vectorAddress) {
-				case RESET_VECTOR: // if the reset vector is missing, how the fuck did you end up here anyway
 				case PANIC_VECTOR:
 				case UNHANDLED_INTERRUPT_VECTOR: {
 					throw new RuntimeException("Critical vector missing: " + vectorAddress);
@@ -731,10 +735,11 @@ public class FL32REmulator implements GenericCPUEmulator {
 	 */
 	final long getVirtualMemorySize() {
 		int size = this.registers[REG_VMEM_MAX_BOUND];
+		long physSize = this.memory.length() & 0xFFFFFFFF;
 		if (size == 0) {
-			return this.memory.length() & 0xFFFFFFFF;
+			return physSize;
 		}
-		return Integer.toUnsignedLong(size);
+		return Math.min(physSize, Integer.toUnsignedLong(size));
 	}
 	
 	/**
@@ -761,6 +766,54 @@ public class FL32REmulator implements GenericCPUEmulator {
 		return Integer.toUnsignedLong(virtualAddress) >= getVirtualMemorySize();
 	}
 	
+	final boolean isPhysicalAddressRAM(long pAddress) {
+		return pAddress <= Integer.toUnsignedLong(RAM_WINDOW_END);
+	}
+	
+	final boolean isPhysicalAddressROM(long pAddress) {
+		return pAddress >= Integer.toUnsignedLong(ROM_MMAP_START) 
+			&& pAddress < Integer.toUnsignedLong(MMIO_REGION_START);
+	}
+	
+	final long pAddressToROMAddress(long pAddress) {
+		return pAddress - Integer.toUnsignedLong(ROM_MMAP_START);
+	}
+	
+	final boolean isPhysicalAddressMMIO(long pAddress) {
+		return pAddress >= Integer.toUnsignedLong(MMIO_REGION_START);
+	}
+	
+	/**
+	 * Reads a single byte from virtual memory
+	 *
+	 * @param vAddress the virtual memory address to read from
+	 * @return the byte value at the specified virtual address
+	 */
+	final byte readByteMemory(int vAddress) {
+		long pAddress = virtualToPhysicalAddress(vAddress);
+		if (isPhysicalAddressRAM(pAddress)) {
+			// guarded normal accessing
+			if (this.isVirtualAddressOOB(vAddress)) {
+				this.raiseFault(FaultType.FAULT_MEM);
+				return 0;
+			}
+			return this.memory.get(pAddress);
+		}
+		
+		System.out.printf("read: 0x%X (%s)\n", pAddress, isPhysicalAddressROM(pAddress));
+		// rom read is allowed, yk, "read only"
+		if (isPhysicalAddressROM(pAddress)) { 
+			System.out.printf("rom address: 0x%X, val: 0x%X\n", pAddressToROMAddress(pAddress), this.readOnlyMemory.get(pAddressToROMAddress(pAddress)));
+			return this.readOnlyMemory.get(pAddressToROMAddress(pAddress));
+		}
+		
+		if (isPhysicalAddressMMIO(pAddress)) {
+			return -1; // TODO 
+		}
+		
+		return 0;
+	}
+	
 	/**
 	 * Writes a single byte to virtual memory.
 	 * <p>
@@ -774,11 +827,19 @@ public class FL32REmulator implements GenericCPUEmulator {
 	 * @param data     the byte value to write
 	 */
 	final void writeByteMemory(int vAddress, byte data) {
-		if (this.isVirtualAddressOOB(vAddress)) {
-			this.raiseFault(FaultType.FAULT_MEM);
-			return;
+		long pAddress = virtualToPhysicalAddress(vAddress);
+		if (isPhysicalAddressRAM(pAddress)) {
+			// guarded normal accessing
+			if (this.isVirtualAddressOOB(vAddress)) {
+				this.raiseFault(FaultType.FAULT_MEM);
+				return;
+			}
+			this.memory.set(pAddress, data);
 		}
-		this.memory.set(virtualToPhysicalAddress(vAddress), data);
+		if (isPhysicalAddressMMIO(pAddress)) {
+			// TODO
+			System.out.println("CPU writes at mmio " + pAddress + " val: " + data);
+		}
 	}
 	
 	/**
@@ -788,24 +849,12 @@ public class FL32REmulator implements GenericCPUEmulator {
 	 * @param data the 32-bit word to write
 	 */
 	final void writeWordMemory(int vAddress, int data) {
-		writeByteMemory(vAddress, (byte) ((data >>> 24) & 0xFF));
-		writeByteMemory(vAddress + 1, (byte) ((data >>> 16) & 0xFF));
-		writeByteMemory(vAddress + 2, (byte) ((data >>> 8) & 0xFF));
+		// hack, write from the furthest so if it fault, the operation
+		// stays atomic
 		writeByteMemory(vAddress + 3, (byte) (data & 0xFF));
-	}
-	
-	/**
-	 * Reads a single byte from virtual memory
-	 *
-	 * @param vAddress the virtual memory address to read from
-	 * @return the byte value at the specified virtual address
-	 */
-	final byte readByteMemory(int vAddress) {
-		if (this.isVirtualAddressOOB(vAddress)) {
-			this.raiseFault(FaultType.FAULT_MEM);
-			return 0;
-		}
-		return this.memory.get(virtualToPhysicalAddress(vAddress));
+		writeByteMemory(vAddress + 2, (byte) ((data >>> 8) & 0xFF));
+		writeByteMemory(vAddress + 1, (byte) ((data >>> 16) & 0xFF));
+		writeByteMemory(vAddress, (byte) ((data >>> 24) & 0xFF));
 	}
 	
 	/**

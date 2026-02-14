@@ -5,18 +5,19 @@ vramFrontBuffer     .word 1073588223 + 1
 ;badapple            .blob "junk/badapple-video.bin"
 badapple            .size(36)
 end                 .size(0)
+number     .word 36
 @text
 ;JMP main
 JMP debug
 debug:
-    LDI  RAX, $badapple
-    LEA  RBX, $badapple
-    CMP  RAX, RBX
-    JEQ  ok
-    JMP  notok
+    LEA  RAX, ok
+    LEA  RBX, $number
+    LDW  RCX, [RBX]
+    JR   RAX
+    KILL
 ok:
     INT  0x50 ; here
-    LDI  RCX, 1
+    LDI  RCX, 255
     KILL
 notok:
     LDI  RCX, 0
