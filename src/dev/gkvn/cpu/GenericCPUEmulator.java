@@ -186,23 +186,17 @@ public interface GenericCPUEmulator {
 	 */
 	boolean[] dumpFlags();
 
-	/**
-	 * @return A read-only view of the emulator's entire memory space. Mutating the
-	 *         returned object must not affect emulator RAM.
-	 */
-	ImmutableByteSpace dumpMemory();
+	// === GETTER BULLSHIT ===
 	
 	/**
-	 * @return The emulator working memory
+	 * @return The emulator current working memory (RAM)
 	 */
 	ByteMemorySpace getMemory();
 	
 	/**
-	 * @return The emulator read only memory
+	 * @return The emulator current read only memory (ROM)
 	 */
-	ByteMemorySpace getROM();
-
-	// === GETTER BULLSHIT ===
+	ByteMemorySpace getReadOnlyMemory();
 
 	/**
 	 * @return true if the CPU has been successfully started via {@link #start()},

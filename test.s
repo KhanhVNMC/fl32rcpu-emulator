@@ -16,7 +16,7 @@ debug:
     JR   RAX
     KILL
 ok:
-    INT  0x50 ; here
+    ;INT  0x50 ; here
     LDI  RCX, 255
     KILL
 notok:

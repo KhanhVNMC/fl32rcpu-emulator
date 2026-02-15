@@ -2,6 +2,7 @@ package dev.gkvn.cpu.demo;
 
 import javax.swing.*;
 
+import dev.gkvn.cpu.ByteMemorySpace;
 import dev.gkvn.cpu.Calc;
 import dev.gkvn.cpu.GenericCPUEmulator;
 import dev.gkvn.cpu.ImmutableByteSpace;
@@ -28,7 +29,7 @@ public class EmulatedDisplay extends JPanel implements Runnable {
 
 	public EmulatedDisplay(GenericCPUEmulator emu) {
 		this.emu = emu;
-		long ramSize = this.emu.dumpMemory().length();
+		long ramSize = this.emu.getMemory().length();
 		long vramSize = ((WIDTH * HEIGHT * 4 * 2 /* 2 buffers, 24 bit color */) + 1);
 		if (ramSize < vramSize) {
 			throw new RuntimeException("cannot do this, need at least: " + vramSize + " bytes of ram");
@@ -48,7 +49,7 @@ public class EmulatedDisplay extends JPanel implements Runnable {
 	}
 	
 	private void updateBuffer() {
-		ImmutableByteSpace memory = emu.dumpMemory();
+		ByteMemorySpace memory = emu.getMemory();
 		this.currentBuffer = 0;
 		int base = vramOffset + 1 + currentBuffer * WIDTH * HEIGHT * 4;
 		for (int y = 0; y < HEIGHT; y++) {

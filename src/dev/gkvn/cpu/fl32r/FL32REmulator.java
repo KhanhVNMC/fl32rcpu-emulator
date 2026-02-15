@@ -301,17 +301,12 @@ public class FL32REmulator implements GenericCPUEmulator {
 	}
 	
 	@Override
-	public ImmutableByteSpace dumpMemory() {
-		return new ImmutableByteSpace(this.memory);
-	}
-	
-	@Override
 	public ByteMemorySpace getMemory() {
 		return this.memory;
 	}
 	
 	@Override
-	public ByteMemorySpace getROM() {
+	public ByteMemorySpace getReadOnlyMemory() {
 		return this.readOnlyMemory;
 	}
 	
@@ -849,8 +844,8 @@ public class FL32REmulator implements GenericCPUEmulator {
 	 * @param data the 32-bit word to write
 	 */
 	final void writeWordMemory(int vAddress, int data) {
-		// hack, write from the furthest so if it fault, the operation
-		// stays atomic
+		// write from the furthest so if it fault, the operation
+		// stays atomic (FL32R specs)
 		writeByteMemory(vAddress + 3, (byte) (data & 0xFF));
 		writeByteMemory(vAddress + 2, (byte) ((data >>> 8) & 0xFF));
 		writeByteMemory(vAddress + 1, (byte) ((data >>> 16) & 0xFF));
@@ -867,11 +862,13 @@ public class FL32REmulator implements GenericCPUEmulator {
 	 * @return the 32-bit word read from virtual memory
 	 */
 	final int readWordMemory(int vAddress) {
+		// read from the furthest, same reason as above
+		byte lsb = readByteMemory(vAddress + 3);
+		byte mb1 = readByteMemory(vAddress + 2);
+		byte mb2 = readByteMemory(vAddress + 1);
+		byte msb = readByteMemory(vAddress);
 		return Utils.beBytesToInt(
-			readByteMemory(vAddress), 
-			readByteMemory(vAddress + 1),
-			readByteMemory(vAddress + 2),
-			readByteMemory(vAddress + 3)
+			msb, mb2, mb1, lsb
 		);
 	}
 	
