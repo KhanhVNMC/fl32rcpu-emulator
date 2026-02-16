@@ -1,9 +1,9 @@
 @data
 vramBufferSelect    .word 1073588223
 vramFrontBuffer     .word 1073588223 + 1
-;vramBackBuffer      .word 1073588223 + 1 + ((640 * 480) * 4)
-;badapple            .blob "junk/badapple-video.bin"
-badapple            .size(36)
+vramBackBuffer      .word 1073588223 + 1 + ((640 * 480) * 4)
+badapple            .blob "junk/badapple-video.bin"
+;badapple            .size(36)
 end                 .size(0)
 number     .word 36
 @text

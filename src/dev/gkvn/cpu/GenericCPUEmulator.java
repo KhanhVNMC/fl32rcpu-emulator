@@ -34,7 +34,7 @@ public interface GenericCPUEmulator {
 	 * @throws IllegalStateException    if a boot program has already been loaded.
 	 * @throws IllegalArgumentException if the program exceeds available memory.
 	 */
-	void loadBootProgram(byte[] program);
+	void loadBootROM(byte[] program);
 
 	/**
 	 * Starts CPU execution on the current thread.

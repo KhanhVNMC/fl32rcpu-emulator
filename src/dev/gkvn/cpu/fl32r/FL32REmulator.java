@@ -38,7 +38,7 @@ public class FL32REmulator implements GenericCPUEmulator {
 	private int frequencyHz;
 	private boolean cpuKilled = false;
 	private boolean cpuStarted = false;
-	private boolean bootProgramLoaded = false;
+	private boolean bootRomLoaded = false;
 	private boolean singleStepMode = false;
 	private Set<Long> breakpointsVirtual = new HashSet<>();
 	private Set<Long> breakpointsPhysical = new HashSet<>();
@@ -70,20 +70,20 @@ public class FL32REmulator implements GenericCPUEmulator {
 	}
 	
 	@Override
-	public void loadBootProgram(byte[] program) {
-		if (bootProgramLoaded) {
-			throw new IllegalStateException("Boot program has already been loaded; cannot load twice!");
+	public void loadBootROM(byte[] program) {
+		if (bootRomLoaded) {
+			throw new IllegalStateException("Boot ROM has already been loaded; cannot load twice!");
 		}
-		if (program.length > memory.length()) {
+		if (program.length > readOnlyMemory.length()) {
 			throw new IllegalArgumentException(
-				"Boot program size (" + program.length + " bytes) exceeds available memory (" + memory.length() + " bytes)!"
+				"Boot ROM size (" + program.length + " bytes) exceeds ROM size (" + readOnlyMemory.length() + " bytes)!"
 			);
 		}
-		// copy over the program to memory (0x0)
+		// copy over the program to rom
 		for (int i = 0; i < program.length; i++) {
 			readOnlyMemory.set(i, program[i]);
 		}
-		this.bootProgramLoaded = true;
+		this.bootRomLoaded = true;
 	}
 	
 	Random r = new Random();

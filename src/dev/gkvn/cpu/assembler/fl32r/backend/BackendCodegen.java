@@ -64,7 +64,7 @@ public class BackendCodegen {
 //			boot[i * 4 + 3] = (byte) (text[i] & 0xFF);
 //			System.out.printf("%08X | %s\n", text[i], String.format("%32s", Integer.toBinaryString(text[i])).replace(' ', '0'));
 //		}
-		emu.loadBootProgram(boot);
+		emu.loadBootROM(boot);
 		EmulatedDisplay screen = new EmulatedDisplay(emu);
 		
 		JFrame frame = new JFrame("FL32R CPU Display");
