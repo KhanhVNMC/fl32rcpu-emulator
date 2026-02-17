@@ -258,7 +258,7 @@ public class FL32REmulator implements GenericCPUEmulator {
 		this.OFL = false;
 		this.HLP = true; // start in the highest level privilege
 		// jump to the VALUE of reset vector (inside the ROM)
-		writeRegister(REG_PROGRAM_COUNTER, ROM_MMAP_START); 
+		writeRegister(REG_PROGRAM_COUNTER, (int) (ROM_MMAP_START & 0xFFFFFFFF)); 
 		if (resetToSingleStepMode) {
 			this.activateSingleStepMode();
 			return;
@@ -562,6 +562,7 @@ public class FL32REmulator implements GenericCPUEmulator {
 				}
 				int resumeAddress = readRegister(rDest);
 				this.HLP = false; // de-escalation, clear HLR
+				this.interruptMask = false; // allows for interrupts
 				writeRegister(REG_PROGRAM_COUNTER, resumeAddress); // and return to the address
 				break;
 			}
@@ -678,15 +679,7 @@ public class FL32REmulator implements GenericCPUEmulator {
 		// jump to interrupt handle (HLP)
 		int irqHandleAddress = readWordMemory(vectorAddress);
 		if (irqHandleAddress == UNDEFINED_VECTOR) {
-			switch (vectorAddress) {
-				case PANIC_VECTOR:
-				case UNHANDLED_INTERRUPT_VECTOR: {
-					throw new RuntimeException("Critical vector missing: " + vectorAddress);
-				}
-				default: {
-					irqHandleAddress = isInterrupt ? UNHANDLED_INTERRUPT_VECTOR : PANIC_VECTOR;
-				}
-			}
+			irqHandleAddress = isInterrupt ? UNHANDLED_INTERRUPT_VECTOR : PANIC_VECTOR;
 		}
 		writeRegister(REG_PROGRAM_COUNTER, irqHandleAddress);
 	}
@@ -762,20 +755,23 @@ public class FL32REmulator implements GenericCPUEmulator {
 	}
 	
 	final boolean isPhysicalAddressRAM(long pAddress) {
-		return pAddress <= Integer.toUnsignedLong(RAM_WINDOW_END);
+		return pAddress <= RAM_WINDOW_END;
 	}
 	
 	final boolean isPhysicalAddressROM(long pAddress) {
-		return pAddress >= Integer.toUnsignedLong(ROM_MMAP_START) 
-			&& pAddress < Integer.toUnsignedLong(MMIO_REGION_START);
-	}
-	
-	final long pAddressToROMAddress(long pAddress) {
-		return pAddress - Integer.toUnsignedLong(ROM_MMAP_START);
+		return pAddress >= ROM_MMAP_START && pAddress < MMIO_REGION_START;
 	}
 	
 	final boolean isPhysicalAddressMMIO(long pAddress) {
-		return pAddress >= Integer.toUnsignedLong(MMIO_REGION_START);
+		return pAddress >= MMIO_REGION_START;
+	}
+	
+	final long pAddressToROMAddress(long pAddress) {
+		return pAddress - ROM_MMAP_START;
+	}
+	
+	final long pAddressToMMIOAddress(long pAddress) {
+		return pAddress - MMIO_REGION_START;
 	}
 	
 	/**
@@ -795,7 +791,7 @@ public class FL32REmulator implements GenericCPUEmulator {
 			return this.memory.get(pAddress);
 		}
 		
-		System.out.printf("read: 0x%X (%s)\n", pAddress, isPhysicalAddressROM(pAddress));
+		System.out.printf("read: 0x%X (is rom: %s)\n", pAddress, isPhysicalAddressROM(pAddress));
 		// rom read is allowed, yk, "read only"
 		if (isPhysicalAddressROM(pAddress)) { 
 			System.out.printf("rom address: 0x%X, val: 0x%X\n", pAddressToROMAddress(pAddress), this.readOnlyMemory.get(pAddressToROMAddress(pAddress)));
@@ -803,7 +799,8 @@ public class FL32REmulator implements GenericCPUEmulator {
 		}
 		
 		if (isPhysicalAddressMMIO(pAddress)) {
-			return -1; // TODO 
+			System.out.printf("MMIO read address: 0x%X\n", pAddressToMMIOAddress(pAddress));
+			return 1; // TODO 
 		}
 		
 		return 0;

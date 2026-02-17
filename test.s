@@ -2,26 +2,42 @@
 vramBufferSelect    .word 1073588223
 vramFrontBuffer     .word 1073588223 + 1
 vramBackBuffer      .word 1073588223 + 1 + ((640 * 480) * 4)
-badapple            .blob "junk/badapple-video.bin"
-;badapple            .size(36)
+;badapple            .blob "junk/badapple-video.bin"
+badapple            .size(36)
 end                 .size(0)
 number     .word 36
 @text
 ;JMP main
-JMP debug
+JMP setuptable
+;JMP debug
+setuptable:
+    LDI  RAX, 0x2C ; interrupt table
+    LEA  RBX, table
+    STW  [RAX], RBX
+    LEA  RBX, table2
+    STW  [RAX + 4], RBX
+    JMP  debug
 debug:
     LEA  RAX, ok
-    LEA  RBX, $number
-    LDW  RCX, [RBX]
     JR   RAX
-    KILL
 ok:
-    ;INT  0x50 ; here
+    INT  0x0 ; here
+    STI
+    INT  0x1 
     LDI  RCX, 255
     KILL
-notok:
-    LDI  RCX, 0
-    KILL
+table:
+    LDI  RDX, 36
+    ; (IRET-ish)
+    GTPC R10
+    STI
+    JR   R10
+table2:
+    LDI  R8, 18
+    ; (IRET-ish)
+    GTPC R10
+    STI
+    JR   R10
 main:
     LDI  RAX, $end
     LDI  RBX, $badapple

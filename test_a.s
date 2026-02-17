@@ -16,7 +16,7 @@ pseudoop_expanding:
     LDI  RCX, 'o'
     ST   $strings[1], RCX
     ; runtime array action
-    LDI  RAX, $strings ; obtain the pointer
+    LEA  RAX, $strings ; obtain the pointer
     ADDI RAX, 1 ; now it is -> at 'o'
     LDB  R7, [RAX] ; load byte
     JMP  ok
