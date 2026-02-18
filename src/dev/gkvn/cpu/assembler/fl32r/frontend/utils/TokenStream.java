@@ -142,6 +142,6 @@ public class TokenStream {
 	
 	@Override
 	public String toString() {
-		return tokens.toString();
+		return tokens.toString() + "|ptr: " + currentToken + ";size:" + tokens.size();
 	}
 }

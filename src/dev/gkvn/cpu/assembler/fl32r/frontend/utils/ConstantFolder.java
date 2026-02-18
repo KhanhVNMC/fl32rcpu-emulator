@@ -1,15 +1,28 @@
 package dev.gkvn.cpu.assembler.fl32r.frontend.utils;
 
+import java.util.Map;
+
+import dev.gkvn.cpu.assembler.fl32r.frontend.core.DefineValue;
 import dev.gkvn.cpu.assembler.fl32r.frontend.exceptions.FrontendSolveError;
 import dev.gkvn.cpu.assembler.fl32r.frontend.lexer.Token;
 import dev.gkvn.cpu.assembler.fl32r.frontend.lexer.TokenType;
 
 public class ConstantFolder {
-	public static int foldExpression(TokenStream stream) throws FrontendSolveError {
+	private Map<String, DefineValue> context;
+	
+	public ConstantFolder(Map<String, DefineValue> context) {
+		this.context = context;
+	}
+	
+	public ConstantFolder() {
+		this(null);
+	}
+	
+	public int foldExpression(TokenStream stream) throws FrontendSolveError {
 		return parseBitShifting(stream);
 	}
 	
-	private static int parseBitShifting(TokenStream stream) throws FrontendSolveError {
+	private int parseBitShifting(TokenStream stream) throws FrontendSolveError {
 		int lvalue = parseAdditive(stream);
 		while (stream.consumeIfMatch(TokenType.BSR, TokenType.BSL)) {
 			Token op = stream.previous();
@@ -23,7 +36,7 @@ public class ConstantFolder {
 		return lvalue;
 	}
 	
-	private static int parseAdditive(TokenStream stream) throws FrontendSolveError {
+	private int parseAdditive(TokenStream stream) throws FrontendSolveError {
 		int lvalue = parseMultiplicative(stream);
 		while (stream.consumeIfMatch(TokenType.PLUS, TokenType.MINUS)) {
 			Token op = stream.previous();
@@ -37,7 +50,7 @@ public class ConstantFolder {
 		return lvalue;
 	}
 	
-	private static int parseMultiplicative(TokenStream stream) throws FrontendSolveError {
+	private int parseMultiplicative(TokenStream stream) throws FrontendSolveError {
 		int lvalue = parseUnary(stream);
 		while (stream.consumeIfMatch(
 			TokenType.STAR, TokenType.SLASH, TokenType.MOD
@@ -54,13 +67,26 @@ public class ConstantFolder {
 		return lvalue;
 	}
 	
-	private static int parseUnary(TokenStream stream) throws FrontendSolveError {
+	private int parseUnary(TokenStream stream) throws FrontendSolveError {
 		if (stream.consumeIfMatch(TokenType.PLUS)) return parseUnary(stream);
 		if (stream.consumeIfMatch(TokenType.MINUS)) return -parseUnary(stream);
 		return parsePrimary(stream);
 	}
 	
-	private static int parsePrimary(TokenStream stream) throws FrontendSolveError {
+	private int parsePrimary(TokenStream stream) throws FrontendSolveError {
+		if (context != null && stream.consumeIfMatch(TokenType.DEFINE_REF)) {
+			String symName = stream.previous().literal();
+			symName = symName.substring(1, symName.length());
+			// read and match the symbol
+			DefineValue value = context.get(symName);
+			if (value == null) {
+				throw new RuntimeException("Undefined symbol '" + symName + "'.");
+			}
+			if (value.isString()) {
+				throw new RuntimeException("Defined symbol '" + symName + "' is a string and cannot be used in a numeric expression.");
+			}
+			return value.getNumber();
+		}
 		if (stream.consumeIfMatch(TokenType.NUMBER)) {
 			return FL32RSpecs.toNumber(stream.previous().literal());
 		}

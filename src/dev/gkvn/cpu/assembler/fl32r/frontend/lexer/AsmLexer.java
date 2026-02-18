@@ -39,7 +39,6 @@ public class AsmLexer {
 		switch (c) {
 			// gloss over comments
 			case ';':
-			case '#':
 				// skip until end of line or EOF
 				while (peek() != '\n' && !isAtEnd()) {
 					advance();
@@ -109,6 +108,9 @@ public class AsmLexer {
 			case '$':
 				variable();
 				break;
+			case '#':
+				defineValRef();
+				break;
 			default: {
 				// if the value is digit, hand over the control to number();
 				if (isDigit(c)) {
@@ -140,9 +142,22 @@ public class AsmLexer {
 			advance();
 		}
 		// at this point, the current pointer would point at
-		// @hello|
+		// $hello|
 		//       ^ here
 		addToken(TokenType.VAR);
+	}
+	
+	/**
+	 * Scan the next directive
+	 */
+	private void defineValRef() {
+		while ( isAlphaNumeric(peek()) ) {
+			advance();
+		}
+		// at this point, the current pointer would point at
+		// %hello|
+		//       ^ here
+		addToken(TokenType.DEFINE_REF);
 	}
 	
 	/**
@@ -197,7 +212,7 @@ public class AsmLexer {
 	        while (isDigit(peek())) {
 	            advance();
 	        }
-	    }
+	    }		
         addToken(TokenType.NUMBER);
 	}
 	

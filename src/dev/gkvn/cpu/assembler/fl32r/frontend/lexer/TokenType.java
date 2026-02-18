@@ -6,6 +6,7 @@ public enum TokenType {
 	STRING, // "s t r i n g"
 	CHAR, // 'c'
 	LABEL, // label:
+	DEFINE_REF, // #defineRef
 	DIRECTIVE, // .directive 
 	DIRECTIVE_SECTION, // @data, @text
 	VAR, // $var

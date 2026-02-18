@@ -1,6 +1,5 @@
 package dev.gkvn.cpu.assembler.fl32r.frontend;
 
-import static dev.gkvn.cpu.assembler.fl32r.frontend.utils.ConstantFolder.*;
 import static dev.gkvn.cpu.assembler.fl32r.frontend.utils.FL32RSpecs.*;
 
 import java.io.ByteArrayOutputStream;
@@ -14,6 +13,7 @@ import java.util.Map;
 import dev.gkvn.cpu.assembler.fl32r.frontend.arch.FEOpCode;
 import dev.gkvn.cpu.assembler.fl32r.frontend.arch.FEOperandType;
 import dev.gkvn.cpu.assembler.fl32r.frontend.core.DataSymbol;
+import dev.gkvn.cpu.assembler.fl32r.frontend.core.DefineValue;
 import dev.gkvn.cpu.assembler.fl32r.frontend.core.Instruction;
 import dev.gkvn.cpu.assembler.fl32r.frontend.core.LabelText;
 import dev.gkvn.cpu.assembler.fl32r.frontend.core.ParsingContext;
@@ -28,6 +28,7 @@ import dev.gkvn.cpu.assembler.fl32r.frontend.operands.SizedMemoryOperand;
 import dev.gkvn.cpu.assembler.fl32r.frontend.operands.MemoryOperand;
 import dev.gkvn.cpu.assembler.fl32r.frontend.operands.Operand;
 import dev.gkvn.cpu.assembler.fl32r.frontend.operands.RegisterOperand;
+import dev.gkvn.cpu.assembler.fl32r.frontend.utils.ConstantFolder;
 import dev.gkvn.cpu.assembler.fl32r.frontend.utils.FL32RSpecs;
 import dev.gkvn.cpu.assembler.fl32r.frontend.utils.TokenStream;
 import dev.gkvn.cpu.assembler.fl32r.frontend.utils.Try;
@@ -49,14 +50,22 @@ public class FLIREmitter {
 		TYPE_EXTERNAL_BLOB = ".blob"
 	;
 	
+	// directive types
+	final static String 
+		DIRECTIVE_DEFINE = ".define",
+		DIRECTIVE_UNDEFINE = ".undef"
+	;
+	
 	// internal backed data structs
 	private AsmLexer lexer;
 	private TokenStream stream;
+	private ConstantFolder folder;
 	
 	public FLIREmitter(AsmLexer lexer) {
 		this.lexer = lexer;
 		this.lexer.scanTokens();
 		this.stream = new TokenStream(this.lexer.tokens);
+		this.folder = new ConstantFolder(defineValues);
 	}
 	
 	public List<TokenStream> lineTokens = new ArrayList<>();
@@ -95,6 +104,9 @@ public class FLIREmitter {
 	private ParsingContext context = ParsingContext.NONE;
 	private Map<String, LabelText> labelAddresses = new HashMap<>();
 	
+	// define values
+	private Map<String, DefineValue> defineValues = new HashMap<>();
+	
 	private void parseLines() throws AsmError {		
 		for (TokenStream line : lineTokens) {
 			if (line.isEmpty()) continue;
@@ -104,14 +116,34 @@ public class FLIREmitter {
 				switch (first.literal()) {
 					case DATA_SECTION -> context = ParsingContext.DATA_SECTION;
 					case TEXT_SECTION -> context = ParsingContext.TEXT_SECTION;
-					default -> throw new AsmError("Unknown directive: " + first.literal(), first);
+					default -> throw new AsmError("Unknown section directive: " + first.literal(), first);
+				}
+				if (line.length() != 1) {
+					// kinda arbritary but, eh
+					throw new AsmError("Context directive must be on its own line.", 
+						line.peekAhead(1)
+					);
+				}
+				continue;
+			}
+			if (first.type() == TokenType.DIRECTIVE) {
+				switch (first.literal()) {
+					case DIRECTIVE_DEFINE -> {
+						this.parseDefineValue(line);
+					}
+					case DIRECTIVE_UNDEFINE -> {
+						this.parseUndefineValue(line);
+					}
+					default -> {
+						throw new AsmError("Unknown directive type", first);
+					}
 				}
 				continue;
 			}
 			// no directive, throw an error
 			if (context == ParsingContext.NONE) {
 				throw new AsmError(
-					"Context Error. Encountered '" + first.literal() + "' before any section directive (@data or @text).",
+					"Context Error. Encountered definition before any section directive (@data or @text).",
 					first
 				);
 			}
@@ -130,28 +162,102 @@ public class FLIREmitter {
 		this.resolveLabelAndVariableAddresses();
 	}
 	
+	// DEFINE VALUES PARSING
+	private void parseDefineValue(TokenStream line) {
+		line.advance(); // consume the `.define`
+		if (line.length() == 1) {
+			throw new AsmError(
+				"Expected a symbol name after .define (e.g. '.define FOO 123')", 
+				line.peekNotNull()
+			);
+		}
+		
+		Token nameTok = line.advance();
+		if (nameTok.type() != TokenType.IDENTIFIER) {
+			throw new AsmError(
+				"Expected a symbol name after .define (e.g. '.define FOO 123')", 
+				nameTok
+			);
+		}
+		
+		String name = nameTok.literal();
+		if (defineValues.containsKey(name)) {
+			throw new AsmError(nameTok,
+				"Defined symbol '%s' already defined on line %d.",
+				name, defineValues.get(name).owner().line()
+			);
+		}
+		
+		// for string def ".define string_val "hi world"
+		Token next = line.peek();
+		if (line.length() == 3 && next.type() == TokenType.STRING) {
+			this.defineValues.put(name, new DefineValue(next, next.literal()));
+			return;
+		}
+		
+		// for numeric & shit ".define num_val 36 + 1
+		this.defineValues.put(name, Try.absorbAsm(() -> new DefineValue(
+			next, folder.foldExpression(line)
+		), line.peekNotNull()));
+	}
+	
+	public void parseUndefineValue(TokenStream line) {
+		line.advance(); // consume the `.define`
+		if (line.length() == 1) {
+			throw new AsmError(
+				"Expected a symbol name after .undef (e.g. '.undef FOO')", 
+				line.peekNotNull()
+			);
+		}
+		
+		Token nameTok = line.advance();
+		if (nameTok.type() != TokenType.IDENTIFIER) {
+			throw new AsmError(
+				"Expected a defined symbol name after .undef (e.g. '.undef FOO')", 
+				nameTok
+			);
+		}
+		
+		String name = nameTok.literal();
+		if (!defineValues.containsKey(name)) {
+			throw new AsmError(nameTok,
+				"Cannot undefine an undefined symbol '%s'.",
+				name
+			);
+		}
+		this.defineValues.remove(name);
+	}
+	
 	// DATA SECTION PARSING
 	private Map<String, DataSymbol> dataSymbols = new HashMap<>();
 	private int dataActivePointer = 0; // data section address counter
 
 	private void parseDataSection(TokenStream line) {
+		if (line.length() == 1) {
+			throw new AsmError(
+				"Data declaration requires a directive after the symbol name.", 
+				line.peekNotNull()
+			);
+		}
+		
 		Token nameTok = line.advance();
 		if (nameTok.type() != TokenType.IDENTIFIER) {
 			throw new AsmError(
-				"Expected data symbol name, got " + nameTok, 
+				"Expected data symbol name, got " + nameTok + ".", 
 				nameTok
 			);
 		}
 		String name = nameTok.literal();
 		if (dataSymbols.containsKey(name)) {
 			throw new AsmError(nameTok,
-				"Data symbol '%s' already defined on line %d",
+				"Data symbol '%s' already defined on line %d.",
 				dataSymbols.get(name).owner().line()
 			);
 		}
+		
 		Token dirTok = line.advance();
 		if (dirTok.type() != TokenType.DIRECTIVE) {
-			throw new AsmError("Expected data directive after symbol name", dirTok);
+			throw new AsmError("Expected data directive after symbol name.", dirTok);
 		}
 		
 		int elementSize;
@@ -178,7 +284,7 @@ public class FLIREmitter {
 					line.peekNotNull()
 				);
 				elementSize = Try.absorbAsm(
-					() -> foldExpression(line),
+					() -> folder.foldExpression(line),
 					line.peekNotNull()
 				);
 				Try.absorbAsm(
@@ -203,14 +309,34 @@ public class FLIREmitter {
 			}
 			case TYPE_STRING, TYPE_NT_STRING -> {
 				Token strToken = line.advance();
-				if (strToken.type() != TokenType.STRING) {
+				String string;
+				if (strToken.type() == TokenType.STRING) {
+					// remove the '"' on both ends
+					string = strToken.literal().substring(1, strToken.literal().length() - 1);
+				} else if (strToken.type() == TokenType.DEFINE_REF) { // symbol lookup
+					String symName = strToken.literal();
+					symName = symName.substring(1, symName.length());
+					// read and match the symbol
+					DefineValue value = defineValues.get(symName);
+					if (value == null) {
+						throw new AsmError(strToken, 
+							"Undefined string symbol '%s'.",
+							symName
+						);
+					}
+					if (!value.isString()) {
+						throw new AsmError(strToken, 
+							"Symbol '%s' is not a string and cannot be used in a string definition.",
+							symName
+						);
+					}
+					string = value.getString();
+				} else {
 					throw new AsmError(strToken,
-						"%s/%s expects a string literal", 
+						"%s/%s expects a string literal (or a symbol)", 
 						TYPE_STRING, TYPE_NT_STRING
 					);
 				}
-				// remove the '""'
-				String string = strToken.literal().substring(1, strToken.literal().length() - 1);
 				boolean isAsciiz = dirTok.literal().equals(TYPE_NT_STRING);
 				elementSize = 1;
 				elementCount = string.length() + (isAsciiz ? 1 : 0);
@@ -267,7 +393,7 @@ public class FLIREmitter {
 			this.emitIntBE(Try.absorbAsm(() -> 
 				FL32RSpecs.requireFitBits(
 					size * 8, // size is in bytes
-					foldExpression(line)
+					folder.foldExpression(line)
 				), 
 				line.peekNotNull()
 			), size);
@@ -408,15 +534,14 @@ public class FLIREmitter {
 					TokenStream bracket = new TokenStream(parsed); // like one below
 					bracket.advance(); // consume the var name
 					if (bracket.consumeIfMatch(TokenType.LSQUARE)) {
-						offset = Try.absorbAsm(() -> foldExpression(bracket), bracket.peekNotNull());
+						offset = Try.absorbAsm(() -> folder.foldExpression(bracket), bracket.peekNotNull());
 						Try.absorbAsm(() -> bracket.consume(TokenType.RSQUARE, 
 							"Expected a closing ']' in variable offset operand!"
 						), bracket.peekNotNull());
 					}
 					// a variable is always pc relative, regardless
 					yield new ImmVariable(
-						varName, 
-						offset, 
+						varName, offset, 
 						32, true, // max width, true = pcRelative
 						varToken
 					);
@@ -458,7 +583,7 @@ public class FLIREmitter {
 						}
 						// at this point the pointer is at the start of the equation to fold
 						offset = new ImmLiteral(
-							Try.absorbAsm(() -> foldExpression(bracket), bracket.peekNotNull()) * 
+							Try.absorbAsm(() -> folder.foldExpression(bracket), bracket.peekNotNull()) * 
 							(offsetToken.is(TokenType.MINUS) ? -1 : 1)
 						); 
 					} else {
@@ -471,8 +596,8 @@ public class FLIREmitter {
 					yield new MemoryOperand(base, offset);
 				}
 				case IMM14_ABS: case IMM16_ABS: case IMM19_ABS:
-				case IMM24_ABS: case IMM24_PC_REL: // PC relative
-				case IMM32_ABS: {
+				case IMM24_ABS: case IMM32_ABS:
+				case IMM24_PC_REL: { // PC relative
 					// if size == 1 & identifier -> must be label
 					// or variable ($var) -> address to the variable
 					if (parsed.size() == 1) { 
@@ -498,7 +623,7 @@ public class FLIREmitter {
 					int value = Try.absorbAsm(() -> 
 						requireFitBits(
 							expected.bitWidth, 
-							foldExpression(new TokenStream(parsed))
+							folder.foldExpression(new TokenStream(parsed))
 						),
 						parsed.get(0)
 					);
