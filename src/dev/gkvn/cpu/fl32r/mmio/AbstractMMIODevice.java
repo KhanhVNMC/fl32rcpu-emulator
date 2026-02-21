@@ -12,7 +12,7 @@ public abstract class AbstractMMIODevice implements MMIODevice {
 	}
 	
 	@Override
-	public long getBaseAddress() {
+	public int getBaseAddress() {
 		return base;
 	}
 	
@@ -21,7 +21,11 @@ public abstract class AbstractMMIODevice implements MMIODevice {
 		return size;
 	}
 	
-	protected void interrupt(int code) {
+	public int offset(int address) {
+		return address - base;
+	}
+	
+	public void interrupt(int code) {
 		mmio.emulator.hardwareIRQ(code);
 	}
 }

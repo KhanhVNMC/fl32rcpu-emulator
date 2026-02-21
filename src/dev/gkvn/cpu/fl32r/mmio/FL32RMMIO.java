@@ -3,6 +3,7 @@ package dev.gkvn.cpu.fl32r.mmio;
 import java.util.ArrayList;
 import java.util.List;
 
+import dev.gkvn.cpu.fl32r.FL32RConstants;
 import dev.gkvn.cpu.fl32r.FL32REmulator;
 
 public final class FL32RMMIO {
@@ -12,32 +13,59 @@ public final class FL32RMMIO {
 	public FL32RMMIO(FL32REmulator emulator) {
 		this.emulator = emulator;
 	}
-
-	public void register(MMIODevice device) {
+	
+	public <T extends MMIODevice> T register(T device) {
 		devices.add(device);
+		return device;
 	}
-
-	public int read32(int address) {
+	
+	public byte readByte(int address) {
+		return (byte)(this.read(address, false) & 0xFF);
+	}
+	
+	public void writeByte(int address, byte b) {
+		this.write(address, false, b);
+	}
+	
+	public int readWord(int address) {
+		return this.read(address, true);
+	}
+	
+	public void writeWord(int address, int word) {
+		this.write(address, true, word);
+	}
+	
+	int read(int address, boolean isWord) {
 		for (MMIODevice d : devices) {
 			if (address >= d.getBaseAddress() 
 			 && address < d.getBaseAddress() + d.getSize()
 			) {
-				return d.read32(address);
+				return isWord ? d.readWord(address) : d.readByte(address);
 			}
 		}
-		emulator.warn("MMIO READ @ 0x%08X is not mapped to any devices");
+		emulator.warn("MMIO %s READ @ 0x%X (=0x%08X) is not mapped to any devices", 
+			(isWord ? "WORD" : "BYTE"), 
+			address, FL32RConstants.MMIO_REGION_START + address
+		);
 		return 0x00;
 	}
-
-	public void write32(int address, int value) {
+	
+	void write(int address, boolean isWord, int value) {
 		for (MMIODevice d : devices) {
 			if (address >= d.getBaseAddress() 
 			 && address < d.getBaseAddress() + d.getSize()
 			) {
-				d.write32(address, value);
+				if (isWord) {
+					d.writeWord(address, value);
+				} else {
+					d.writeByte(address, (byte)(value & 0xFF));
+				}
 				return;
 			}
 		}
-		emulator.warn("MMIO WRITE @ 0x%08X is not mapped to any devices");
+		emulator.warn("MMIO %s WRITE @ 0x%X (=0x%08X) is not mapped to any devices", 
+			(isWord ? "WORD" : "BYTE"), 
+			address, FL32RConstants.MMIO_REGION_START + address
+		);	
 	}
 }

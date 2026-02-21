@@ -65,8 +65,8 @@ public enum FEOpCode {
 	HLR   (1, REG),
 	STI   (1),
 	CLI   (1),
-	GTFS  (1, REG),
-	GTPC  (1, REG),
+	LIFR  (1, REG),
+	LIPR  (1, REG),
 	STFS  (1, REG),
 	
 	NOP   (1),

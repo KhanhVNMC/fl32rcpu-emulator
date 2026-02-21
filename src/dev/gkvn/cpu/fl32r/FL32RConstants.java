@@ -83,8 +83,8 @@ public class FL32RConstants {
 		HLR  = 0x52, // de-escalation, clear HLR and return to the address on the register
 		STI  = 0x53, // allow interrupts to happen (SeT Interrupt flag
 		CLI  = 0x54, // disallow interrupts (CLear Interrupt flag)
-		GTFS = 0x55, // copy IFR (interrupt flags register) to a GPR
-		GTPC = 0x56, // copy IPR (interrupt program counter register) to a GPR
+		LIFR = 0x55, // copy IFR (interrupt flags register) to a GPR
+		LIPR = 0x56, // copy IPR (interrupt program counter register) to a GPR
 		STFS = 0x57, // set the current cpu flags to a packed value in a register
 		NOP  = 0x00, // no-op
 		HLT  = 0x7A, // halt the cpu
@@ -123,7 +123,7 @@ public class FL32RConstants {
 		PANIC_VECTOR = 0x04,
 		UNHANDLED_INTERRUPT_VECTOR = 0x08,
 		
-		// faults
+		// faults	
 		FAULT_MEM_VECTOR = 0x0C,
 		FAULT_PRIV_VECTOR = 0x10,
 		FAULT_ILLEGAL_VECTOR = 0x14,
@@ -131,10 +131,10 @@ public class FL32RConstants {
 		FAULT_STACK_OVERFLOW_VECTOR = 0x1C,
 		FAULT_STACK_UNDERFLOW_VECTOR = 0x20,
 		FAULT_OVERFLOW_VECTOR = 0x24,
-		BREAKPOINT_VECTOR = 0x28,
+		FAULT_EXEC_VECTOR = 0x28,
 		
 		// software/hardware interrupts
-		SOFTWARE_INT_BASE = BREAKPOINT_VECTOR + WORD_SIZE,
+		SOFTWARE_INT_BASE = FAULT_EXEC_VECTOR + WORD_SIZE,
 		SOFTWARE_INT_COUNT = 40,
 		SOFTWARE_INT_END = (SOFTWARE_INT_BASE + (WORD_SIZE * SOFTWARE_INT_COUNT)) - WORD_SIZE,
 		

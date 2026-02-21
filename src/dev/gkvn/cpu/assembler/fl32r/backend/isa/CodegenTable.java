@@ -76,9 +76,9 @@ public class CodegenTable {
 		entry(HLR,   rType(FL32RConstants.HLR));
 		entry(STI,   noType(FL32RConstants.STI));
 		entry(CLI,   noType(FL32RConstants.CLI));
-		entry(GTFS,  rType(FL32RConstants.HLR));
-		entry(GTPC,  rType(FL32RConstants.GTPC));
-		entry(STFS,  rType(FL32RConstants.HLR));
+		entry(LIFR,  rType(FL32RConstants.LIFR));
+		entry(LIPR,  rType(FL32RConstants.LIPR));
+		entry(STFS,  rType(FL32RConstants.STFS));
 		entry(NOP,   noType(FL32RConstants.NOP));
 		entry(KILL,  noType(FL32RConstants.KILL));
 		

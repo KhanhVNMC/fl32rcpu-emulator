@@ -74,7 +74,7 @@ public class EmulatedDisplay extends JPanel implements Runnable {
 			updateBuffer();
 			repaint();
 			try {
-				Thread.sleep(0); // ~60 FPS
+				Thread.sleep(16); // ~60 FPS
 			} catch (InterruptedException e) {
 				break;
 			}

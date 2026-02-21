@@ -9,8 +9,9 @@ import java.util.Set;
 
 import dev.gkvn.cpu.ByteMemorySpace;
 import dev.gkvn.cpu.GenericCPUEmulator;
-import dev.gkvn.cpu.ImmutableByteSpace;
 import dev.gkvn.cpu.fl32r.mmio.FL32RMMIO;
+import dev.gkvn.cpu.fl32r.mmio.devs.DebugConsoleMMIO;
+import dev.gkvn.cpu.fl32r.mmio.devs.HardwareTimerMMIO;
 
 // this CPU is BIG-ENDIAN, 32-bit processor with primitive MMU
 // FL32RCPU -> Fixed Length 32-bit RISC CPU
@@ -33,7 +34,7 @@ public class FL32REmulator implements GenericCPUEmulator {
 	private boolean cpuHalted = false;
 	private int IPR = 0, IFR = 0; // interrupt saved program counter and flag (return)
 	private boolean interruptMask = false; // mask == int not allowed
-	private FL32RMMIO mmio;
+	private FL32RMMIO mmioBus;
 	
 	// emulator parameter/controls
 	private double nsPerCycle;
@@ -45,6 +46,9 @@ public class FL32REmulator implements GenericCPUEmulator {
 	private Set<Long> breakpointsVirtual = new HashSet<>();
 	private Set<Long> breakpointsPhysical = new HashSet<>();
 	
+	// some stupid
+	private HardwareTimerMMIO timer;
+	
 	public FL32REmulator(long memorySize) {
 		// clamp memorySize to 32-bit unsigned max
 		if (memorySize < 0 || memorySize > 0xFFFFFFFFL) {
@@ -52,8 +56,16 @@ public class FL32REmulator implements GenericCPUEmulator {
 		}
 		this.setFrequencyHz(32_000_000); // 32 MHZ cpu
 		this.memory = new ByteMemorySpace(memorySize);
-		this.readOnlyMemory = new ByteMemorySpace(1024); // 1 byte of ROM (for boot code)
-		this.mmio = new FL32RMMIO(this);
+		this.readOnlyMemory = new ByteMemorySpace(ROM_SIZE); // 1 MB of ROM (for boot code)
+		this.mmioBus = new FL32RMMIO(this);
+		
+		// MMIO devices test
+		this.timer = this.mmioBus.register(new HardwareTimerMMIO(mmioBus, 0x0));
+		this.mmioBus.register(new DebugConsoleMMIO (mmioBus, 0x0 + 16));
+	}
+	
+	public FL32RMMIO getMmioBus() {
+		return mmioBus;
 	}
 	
 	@Override
@@ -183,9 +195,15 @@ public class FL32REmulator implements GenericCPUEmulator {
 	 * real hardware speed with spin wait.
 	 */
 	private synchronized final void stepNextInstruction() {
+		this.timer.tick(); // MMIO Timer
 		try {
 			// ===== FETCH =====
 			int currentPC = this.readRegister(REG_PROGRAM_COUNTER);
+			// prevent PC runaway into MMIO
+			if (isPhysicalAddressMMIO(virtualToPhysicalAddress(currentPC))) {
+				this.raiseFault(FaultType.FAULT_EXEC);
+				return;
+			}
 			int instruction = this.readWordMemory(currentPC);
 			boolean breakPointHit = this.isAtBreakpoint(currentPC);
 			if (breakPointHit && !this.isOnSingleStepMode()) {
@@ -301,13 +319,6 @@ public class FL32REmulator implements GenericCPUEmulator {
 	@Override
 	public boolean isKilled() {
 		return this.cpuKilled;
-	}
-	
-	public void warn(String string, Object... fmt) {
-		System.out.printf("[WARNING] " + string + 
-			String.format(" (pc=0x%08X)", readRegister(REG_PROGRAM_COUNTER)), 
-			fmt
-		);
 	}
 	
 	@Override
@@ -577,7 +588,7 @@ public class FL32REmulator implements GenericCPUEmulator {
 				break;
 			}
 			// copy IFR into a general purpose reg
-			case GTFS: {
+			case LIFR: {
 				if (!this.HLP) raiseFault(FaultType.FAULT_PRIV);
 				writeRegister(rDest, this.IFR);
 				break;
@@ -592,7 +603,7 @@ public class FL32REmulator implements GenericCPUEmulator {
 				break;
 			}
 			// copy IPR into a general purpose reg
-			case GTPC: {
+			case LIPR: {
 				if (!this.HLP) raiseFault(FaultType.FAULT_PRIV);
 				writeRegister(rDest, this.IPR);
 				break;
@@ -635,14 +646,16 @@ public class FL32REmulator implements GenericCPUEmulator {
 		// enters the trap
 		int toEnter = switch (faultType) {
 			case FAULT_MEM -> FAULT_MEM_VECTOR;
+			case FAULT_PRIV -> FAULT_PRIV_VECTOR;
 			case FAULT_ILLEGAL -> FAULT_ILLEGAL_VECTOR;
 			case FAULT_DIVZERO -> FAULT_DIVZERO_VECTOR;
 			case FAULT_STACK_OVERFLOW -> FAULT_STACK_OVERFLOW_VECTOR;
 			case FAULT_STACK_UNDERFLOW -> FAULT_STACK_UNDERFLOW_VECTOR;
 			case FAULT_OVERFLOW -> FAULT_OVERFLOW_VECTOR;
-			default -> throw new RuntimeException("Emulator not up to spec!"); 
+			case FAULT_EXEC -> FAULT_EXEC_VECTOR;
+			default -> throw new RuntimeException("Emulator not up to spec, missing: " + faultType); 
 		};
-		System.out.printf("FAULT: %s, pc=0x%X, fault handler at 0x%X &(0x%X)\n", 
+		this.debug("FAULT: %s, pc=0x%X, fault handler at *(0x%X) = 0x%X", 
 			faultType, readRegister(REG_PROGRAM_COUNTER) - 4, toEnter,
 			readWordMemory(toEnter)
 		);
@@ -673,6 +686,7 @@ public class FL32REmulator implements GenericCPUEmulator {
 	final void enterTrap(int vectorAddress, boolean isInterrupt) {
 		// if its already in HLP and a fault fires, you are cooked
 		if (this.HLP && !isInterrupt) {
+			this.debug("HLP FAULT! Original VA: 0x%X -> Reloc VA: 0x%X (PANIC)", vectorAddress, PANIC_VECTOR);
 			vectorAddress = PANIC_VECTOR; // panic
 		}
 		if (isInterrupt && interruptMask) {
@@ -688,8 +702,11 @@ public class FL32REmulator implements GenericCPUEmulator {
 		// jump to interrupt handle (HLP)
 		int irqHandleAddress = readWordMemory(vectorAddress);
 		if (irqHandleAddress == UNDEFINED_VECTOR) {
-			irqHandleAddress = isInterrupt ? UNHANDLED_INTERRUPT_VECTOR : PANIC_VECTOR;
+			int fallback = readWordMemory(isInterrupt ? UNHANDLED_INTERRUPT_VECTOR : PANIC_VECTOR);
+			this.debug("IRQ/FAULT VECTOR @ 0x%X is undefined, falling back to: *fallback = 0x%X.", vectorAddress, fallback);
+			irqHandleAddress = fallback;
 		}
+		this.debug("IRQ/FAULT HANDLER: JUMPING TO 0x%X", irqHandleAddress);
 		writeRegister(REG_PROGRAM_COUNTER, irqHandleAddress);
 	}
 	
@@ -779,8 +796,8 @@ public class FL32REmulator implements GenericCPUEmulator {
 		return pAddress & 0x000FFFFF; // mask upper 12 bits
 	}
 	
-	final long pAddressToMMIOAddress(long pAddress) {
-		return pAddress & 0x07FFFFFF; // mask upper 5 bits
+	final int pAddressToMMIOAddress(long pAddress) {
+		return (int) (pAddress & 0x07FFFFFF); // mask upper 5 bits
 	}
 	
 	/**
@@ -791,6 +808,15 @@ public class FL32REmulator implements GenericCPUEmulator {
 	 */
 	final byte readByteMemory(int vAddress) {
 		long pAddress = virtualToPhysicalAddress(vAddress);
+		if (isPhysicalAddressMMIO(pAddress)) {
+			return mmioBus.readByte(pAddressToMMIOAddress(pAddress));
+		}
+		
+		// rom read is allowed, yk, "read only"
+		if (isPhysicalAddressROM(pAddress + 3)) { 
+			return this.readOnlyMemory.get(pAddressToROMAddress(pAddress));
+		}
+		
 		if (isPhysicalAddressRAM(pAddress)) {
 			// guarded normal accessing
 			if (this.isVirtualAddressOOB(vAddress)) {
@@ -799,18 +825,6 @@ public class FL32REmulator implements GenericCPUEmulator {
 			}
 			return this.memory.get(pAddress);
 		}
-		
-		System.out.printf("read: 0x%X (is rom: %s)\n", pAddress, isPhysicalAddressROM(pAddress));
-		// rom read is allowed, yk, "read only"
-		if (isPhysicalAddressROM(pAddress)) { 
-			System.out.printf("rom address: 0x%X, val: 0x%X\n", pAddressToROMAddress(pAddress), this.readOnlyMemory.get(pAddressToROMAddress(pAddress)));
-			return this.readOnlyMemory.get(pAddressToROMAddress(pAddress));
-		}
-		
-		if (isPhysicalAddressMMIO(pAddress)) {
-			return mmio.read32((int) pAddressToMMIOAddress(pAddress));
-		}
-		
 		return 0;
 	}
 	
@@ -828,6 +842,12 @@ public class FL32REmulator implements GenericCPUEmulator {
 	 */
 	final void writeByteMemory(int vAddress, byte data) {
 		long pAddress = virtualToPhysicalAddress(vAddress);
+		
+		if (isPhysicalAddressMMIO(pAddress)) {
+			mmioBus.writeByte(pAddressToMMIOAddress(pAddress), data);
+			return;
+		}
+		
 		if (isPhysicalAddressRAM(pAddress)) {
 			// guarded normal accessing
 			if (this.isVirtualAddressOOB(vAddress)) {
@@ -835,10 +855,6 @@ public class FL32REmulator implements GenericCPUEmulator {
 				return;
 			}
 			this.memory.set(pAddress, data);
-		}
-		if (isPhysicalAddressMMIO(pAddress)) {
-			// TODO
-			System.out.println("CPU writes at mmio " + pAddress + " val: " + data);
 		}
 	}
 	
@@ -849,6 +865,12 @@ public class FL32REmulator implements GenericCPUEmulator {
 	 * @param data the 32-bit word to write
 	 */
 	final void writeWordMemory(int vAddress, int data) {
+		long pAddress = virtualToPhysicalAddress(vAddress);
+		if (isPhysicalAddressMMIO(pAddress)) {
+			mmioBus.writeWord(pAddressToMMIOAddress(pAddress), data);
+			return;
+		}
+		
 		// write from the furthest so if it fault, the operation
 		// stays atomic (FL32R specs)
 		writeByteMemory(vAddress + 3, (byte) (data & 0xFF));
@@ -867,6 +889,11 @@ public class FL32REmulator implements GenericCPUEmulator {
 	 * @return the 32-bit word read from virtual memory
 	 */
 	final int readWordMemory(int vAddress) {
+		long pAddress = virtualToPhysicalAddress(vAddress);
+		if (isPhysicalAddressMMIO(pAddress)) {
+			return mmioBus.readWord(pAddressToMMIOAddress(pAddress));
+		}
+		
 		// read from the furthest, same reason as above
 		byte lsb = readByteMemory(vAddress + 3);
 		byte mb1 = readByteMemory(vAddress + 2);
@@ -902,5 +929,25 @@ public class FL32REmulator implements GenericCPUEmulator {
 		//       ^^ OLD      ^^ new HEAD after POP
 		writeRegister(REG_STACK_POINTER, target + 4); // consume the latest value
 		return value;
+	}
+	
+	// EMULATOR SHIT
+	public void warn(String string, Object... fmt) {
+		System.out.printf("[WARNING] " + string + currentState(),
+			fmt
+		);
+	}
+	
+	public void debug(String string, Object... fmt) {
+		System.out.printf("[DEBUG] " + string + currentState(),
+			fmt
+		);
+	}
+	
+	private String currentState() {
+		return String.format(" (pc=0x%08X, hlp=%s)\n", 
+			readRegister(REG_PROGRAM_COUNTER) - 4, 
+			this.HLP
+		);
 	}
 }
