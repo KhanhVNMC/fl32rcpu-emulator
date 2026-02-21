@@ -116,7 +116,7 @@ public class FLIREmitter {
 				switch (first.literal()) {
 					case DATA_SECTION -> context = ParsingContext.DATA_SECTION;
 					case TEXT_SECTION -> context = ParsingContext.TEXT_SECTION;
-					default -> throw new AsmError("Unknown section directive: " + first.literal(), first);
+					default -> throw new AsmError("Unknown context directive type: " + first.literal(), first);
 				}
 				if (line.length() != 1) {
 					// kinda arbritary but, eh
@@ -326,14 +326,14 @@ public class FLIREmitter {
 					}
 					if (!value.isString()) {
 						throw new AsmError(strToken, 
-							"Symbol '%s' is not a string and cannot be used in a string definition.",
+							"Defined symbol '%s' is not a string and cannot be used in a string definition.",
 							symName
 						);
 					}
 					string = value.getString();
 				} else {
 					throw new AsmError(strToken,
-						"%s/%s expects a string literal (or a symbol)", 
+						"%s/%s expects a string literal (or a defined symbol)", 
 						TYPE_STRING, TYPE_NT_STRING
 					);
 				}

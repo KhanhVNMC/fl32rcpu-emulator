@@ -10,6 +10,7 @@ import java.util.Set;
 import dev.gkvn.cpu.ByteMemorySpace;
 import dev.gkvn.cpu.GenericCPUEmulator;
 import dev.gkvn.cpu.ImmutableByteSpace;
+import dev.gkvn.cpu.fl32r.mmio.FL32RMMIO;
 
 // this CPU is BIG-ENDIAN, 32-bit processor with primitive MMU
 // FL32RCPU -> Fixed Length 32-bit RISC CPU
@@ -32,6 +33,7 @@ public class FL32REmulator implements GenericCPUEmulator {
 	private boolean cpuHalted = false;
 	private int IPR = 0, IFR = 0; // interrupt saved program counter and flag (return)
 	private boolean interruptMask = false; // mask == int not allowed
+	private FL32RMMIO mmio;
 	
 	// emulator parameter/controls
 	private double nsPerCycle;
@@ -51,6 +53,7 @@ public class FL32REmulator implements GenericCPUEmulator {
 		this.setFrequencyHz(32_000_000); // 32 MHZ cpu
 		this.memory = new ByteMemorySpace(memorySize);
 		this.readOnlyMemory = new ByteMemorySpace(1024); // 1 byte of ROM (for boot code)
+		this.mmio = new FL32RMMIO(this);
 	}
 	
 	@Override
@@ -298,6 +301,13 @@ public class FL32REmulator implements GenericCPUEmulator {
 	@Override
 	public boolean isKilled() {
 		return this.cpuKilled;
+	}
+	
+	public void warn(String string, Object... fmt) {
+		System.out.printf("[WARNING] " + string + 
+			String.format(" (pc=0x%08X)", readRegister(REG_PROGRAM_COUNTER)), 
+			fmt
+		);
 	}
 	
 	@Override
@@ -637,7 +647,6 @@ public class FL32REmulator implements GenericCPUEmulator {
 			readWordMemory(toEnter)
 		);
 		enterTrap(toEnter, false);
-		System.exit(1);
 		// abuse jvm exception latching
 		throw new FaultRaisedException(); // interrupts current execute() (latch)
 	}
@@ -755,23 +764,23 @@ public class FL32REmulator implements GenericCPUEmulator {
 	}
 	
 	final boolean isPhysicalAddressRAM(long pAddress) {
-		return pAddress <= RAM_WINDOW_END;
+		return !(isPhysicalAddressROM(pAddress) || isPhysicalAddressMMIO(pAddress));
 	}
 	
 	final boolean isPhysicalAddressROM(long pAddress) {
-		return pAddress >= ROM_MMAP_START && pAddress < MMIO_REGION_START;
+		return (pAddress >>> 20 == 0b111101111111);
 	}
 	
 	final boolean isPhysicalAddressMMIO(long pAddress) {
-		return pAddress >= MMIO_REGION_START;
+		return (pAddress >>> 27) == 0b11111;
 	}
 	
 	final long pAddressToROMAddress(long pAddress) {
-		return pAddress - ROM_MMAP_START;
+		return pAddress & 0x000FFFFF; // mask upper 12 bits
 	}
 	
 	final long pAddressToMMIOAddress(long pAddress) {
-		return pAddress - MMIO_REGION_START;
+		return pAddress & 0x07FFFFFF; // mask upper 5 bits
 	}
 	
 	/**
@@ -799,8 +808,7 @@ public class FL32REmulator implements GenericCPUEmulator {
 		}
 		
 		if (isPhysicalAddressMMIO(pAddress)) {
-			System.out.printf("MMIO read address: 0x%X\n", pAddressToMMIOAddress(pAddress));
-			return 1; // TODO 
+			return mmio.read32((int) pAddressToMMIOAddress(pAddress));
 		}
 		
 		return 0;

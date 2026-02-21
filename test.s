@@ -7,11 +7,13 @@
 .undef SIZE 
 .define SIZE 8
 
+;.include "test_a.s"
+
 @data
-value    .word #SIZE
-ballsack .asciz #STR
+    value    .word #SIZE
+    ballsack .asciz #STR
 
 @text
-LD RBX, $value
-LD RAX, $ballsack[#ZERO + 1] 
-KILL
+    LD RBX, $value
+    ;LD RAX, $ballsack[#ZERO + 1] 
+    KILL
