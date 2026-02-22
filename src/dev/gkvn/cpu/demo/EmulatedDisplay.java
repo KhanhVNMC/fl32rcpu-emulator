@@ -17,7 +17,7 @@ import java.awt.image.BufferedImage;
 
 public class EmulatedDisplay extends JPanel implements Runnable {
 	private static final long serialVersionUID = 1L;
-	private static final int WIDTH = 160;
+	private static final int WIDTH = 100;
 	private static final int HEIGHT = 120;
 
 	private final GenericCPUEmulator emu;
@@ -51,7 +51,7 @@ public class EmulatedDisplay extends JPanel implements Runnable {
 	private void updateBuffer() {
 		ByteMemorySpace memory = emu.getMemory();
 		this.currentBuffer = 0;
-		int base = vramOffset + 1 + currentBuffer * WIDTH * HEIGHT * 4;
+		int base = 0;//vramOffset + 1 + currentBuffer * WIDTH * HEIGHT * 4;
 		for (int y = 0; y < HEIGHT; y++) {
 			for (int x = 0; x < WIDTH; x++) {
 				int index = y * WIDTH + x;

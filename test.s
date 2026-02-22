@@ -13,8 +13,7 @@
 .define TIMER_ENABLE    1 << 0
 
 @data
-string .ascii "Hello World Ball Sack. "
-str2   .asciz "This string would be printed too." 
+string .blob "loremipsum.txt"
 @text
 
 __entry__:
@@ -23,9 +22,14 @@ __entry__:
     LDI     R8, #TIMER_ENABLE
     LDI     R7, #TIMER_CNT_CTRL
     STW     [R7], R8
-    ; sleep
-    LDI     r8, 5000000
-    CALL    sleep
+    loopa:
+        ; print something
+        CALL    print_funny
+        ; sleep
+        LDI     r8, 2000000 ; sleep for 2s
+        CALL    sleep
+        JMP loopa
+    ; die
     KILL
 
 get_time:
@@ -42,16 +46,16 @@ sleep:
     roll:
         CALL    get_time
         CMP     R3, R8
-        JLE     roll
+        JLT     roll
     RET
 
-main:
+print_funny:
     LDI     R8,  #UART_DEVICE
     LDI     R7,  #UART_TX_READY
     LEA     RAX, $string ; pointer passed in RAX
     CALL    print
     LDI     R10, 255
-    KILL
+    RET
 
 print:
     ; RAX = pointer to data
@@ -59,15 +63,15 @@ print:
     ; R7  = UART_TX_READY
     MOV     RBX, RAX ; RBX = current pointer
     print_loop:
-    LDB     RCX, [RBX]
-    CMP     RCX, RZERO
-    JEQ     done
-    STB     [R8], RCX ; write byte to UART
-    ADDI    RBX, 1
-    wait_dev_ready:
-    LDB     R4, [R7]
-    CMP     R4, RZERO
-    JEQ     wait_dev_ready
-    JMP     print_loop
+        LDB     RCX, [RBX]
+        CMP     RCX, RZERO
+        JEQ     done
+        STB     [R8], RCX ; write byte to UART
+        ADDI    RBX, 1
+        wait_dev_ready:
+            LDB     R4, [R7]
+            CMP     R4, RZERO 
+            JEQ     wait_dev_ready
+        JMP     print_loop
     done:
     RET

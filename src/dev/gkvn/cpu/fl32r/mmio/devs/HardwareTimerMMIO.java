@@ -49,13 +49,7 @@ public final class HardwareTimerMMIO extends AbstractMMIODevice {
 			default -> 0;
 		};
 	}
-
-	@Override
-	public byte readByte(int address) {
-		int shift = (address & 3) * 8;
-		return (byte) ((readWord(address & ~3) >>> shift) & 0xFF);
-	}
-
+	
 	@Override
 	public void writeWord(int address, int value) {
 		switch (offset(address)) {
@@ -75,15 +69,6 @@ public final class HardwareTimerMMIO extends AbstractMMIODevice {
 				this.packedCtrl = value & ~(CTRL_RESET | CTRL_IRQ_ACK);
 			}
 		}
-	}
-
-	@Override
-	public void writeByte(int address, byte value) {
-		int shift = (address & 3) * 8;
-		int mask = 0xFF << shift;
-		int word = readWord(address & ~3); // java sign extension
-		word = (word & ~mask) | ((value & 0xFF) << shift);
-		writeWord(address & ~3, word);
 	}
 
 	private void resetCounter() {
