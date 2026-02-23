@@ -23,6 +23,14 @@ public class ByteMemorySpace {
 			chunks[totalChunks - 1] = new byte[remaining];
 		}
 	}
+	
+	public byte getUInt(int rawInt) {
+		return get(Integer.toUnsignedLong(rawInt));
+	}
+	
+	public void setUInt(int rawInt, byte value) {
+		set(Integer.toUnsignedLong(rawInt), value);
+	}
 
 	public byte get(long index) {
 		checkIndex(index);

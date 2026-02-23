@@ -2,7 +2,6 @@ package dev.gkvn.cpu.fl32r;
 
 import static dev.gkvn.cpu.fl32r.FL32RConstants.*;
 
-import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Random;
@@ -46,7 +45,6 @@ public class FL32REmulator implements GenericCPUEmulator {
 	private boolean cpuStarted = false;
 	private boolean bootRomLoaded = false;
 	private boolean singleStepMode = false;
-	private Set<Long> breakpointsVirtual = new HashSet<>();
 	private Set<Long> breakpointsPhysical = new HashSet<>();
 	
 	// some stupid
@@ -212,7 +210,7 @@ public class FL32REmulator implements GenericCPUEmulator {
 			// ===== FETCH =====
 			int currentPC = this.readRegister(REG_PROGRAM_COUNTER);
 			// prevent PC runaway into MMIO
-			if (isPhysicalAddressMMIO(virtualToPhysicalAddress(currentPC))) {
+			if (isPhysicalAddressMMIO(currentPC)) {
 				this.raiseFault(FaultType.FAULT_EXEC);
 				return;
 			}
@@ -250,22 +248,11 @@ public class FL32REmulator implements GenericCPUEmulator {
 		} // runtime exception will throw immediately, crashing the entire emulator (as it should)
 	}
 	
-	/**
-	 * Determines whether the current program counter (PC) matches ANY active breakpoint,
-	 * either virtual or physical. This method is called after FETCH.
-	 *
-	 * @param currentVirtualPC the program counter value before executing the current instruction,
-               interpreted as a 32-bit uint virtual address
-	 * @return {@code true} if an enabled breakpoint exists at the current PC,
-	 *         {@code false} otherwise
-	 */
-	public boolean isAtBreakpoint(int currentVirtualPC) {
-		if (breakpointsVirtual.size() == 0 && breakpointsPhysical.size() == 0) {
+	public boolean isAtBreakpoint(int currentPC) {
+		if (breakpointsPhysical.size() == 0) {
 			return false;
 		}
-		long virtualAddress = Integer.toUnsignedLong(currentVirtualPC);
-		long physicalAddress = virtualToPhysicalAddress(currentVirtualPC);
-		return breakpointsVirtual.contains(virtualAddress) || breakpointsPhysical.contains(physicalAddress);
+		return breakpointsPhysical.contains(Integer.toUnsignedLong(currentPC));
 	}
  	
 	@Override
@@ -306,16 +293,6 @@ public class FL32REmulator implements GenericCPUEmulator {
 		}
 		this.halt();
 		this.cpuKilled = true;
-	}
-	
-	@Override
-	public void addBreakpoint(long virtualAddress) {
-		breakpointsVirtual.add(virtualAddress);
-	}
-	
-	@Override
-	public void removeBreakpoint(long virtualAddress) {
-		breakpointsVirtual.remove(virtualAddress);
 	}
 	
 	@Override
@@ -640,7 +617,7 @@ public class FL32REmulator implements GenericCPUEmulator {
 			}
 			// Kills the cpu immediately (emulator-only instruction)
 			case KILL: { 
-				if (!this.HLP) raiseFault(FaultType.FAULT_PRIV);
+				//if (!this.HLP) raiseFault(FaultType.FAULT_PRIV);
 				this.kill();
 				break;
 			}
@@ -667,9 +644,14 @@ public class FL32REmulator implements GenericCPUEmulator {
 			case FAULT_EXEC -> FAULT_EXEC_VECTOR;
 			default -> throw new RuntimeException("Emulator not up to spec, missing: " + faultType); 
 		};
-		this.debug("FAULT: %s, pc=0x%X, fault handler at *(0x%X) = 0x%X", 
+		this.debug("FAULT: %s, pc=0x%X, fault handler at *(0x%X) = 0x%08X", 
 			faultType, readRegister(REG_PROGRAM_COUNTER) - 4, toEnter,
-			readWordMemory(toEnter)
+			Utils.beBytesToInt(
+				memory.getUInt(toEnter), 
+				memory.getUInt(toEnter + 1), 
+				memory.getUInt(toEnter + 2), 
+				memory.getUInt(toEnter + 3)
+			)
 		);
 		enterTrap(toEnter, false);
 		// abuse jvm exception latching
@@ -749,168 +731,120 @@ public class FL32REmulator implements GenericCPUEmulator {
 	}
 	
 	// MEMORY MANIPULATION
-	/**
-	 * Returns the size of the virtual memory region, interpreted as an UINT32!
-	 * <p>
-	 * The size is determined by the {@code REG_VMEM_MAX_BOUND} register.
-	 * If that register contains {@code 0}, the size defaults to the physical memory
-	 * length (HLP).
-	 *
-	 * @return the virtual memory size as an unsigned 32-bit value represented in a
-	 *         {@code long}.
-	 */
-	final long getVirtualMemorySize() {
+	final boolean isPhysicalAddressRAM(int pAddress) {
+		return !(isPhysicalAddressROM(pAddress) || isPhysicalAddressMMIO(pAddress));
+	}
+	
+	final boolean isPhysicalAddressROM(int pAddress) {
+		return (pAddress >>> 20) == 0b111101111111;
+	}
+	
+	final boolean isPhysicalAddressMMIO(int pAddress) {
+		return (pAddress >>> 27) == 0b11111;
+	}
+	
+	final int pAddressToROMAddress(int pAddress) {
+		return pAddress & 0x000FFFFF; // mask upper 12 bits
+	}
+	
+	final int pAddressToMMIOAddress(int pAddress) {
+		return pAddress & 0x07FFFFFF; // mask upper 5 bits
+	}
+	
+	final long getMemorySize() {
 		int size = this.registers[REG_VMEM_MAX_BOUND];
 		long physSize = this.memory.length() & 0xFFFFFFFF;
 		if (size == 0) {
 			return physSize;
 		}
-		return Math.min(physSize, Integer.toUnsignedLong(size));
+		return Math.min(physSize, uinttl(size));
 	}
 	
-	/**
-	 * Translates a virtual address into a physical address using UINT32
-	 * wraparound semantics.
-	 * <p>
-	 * The translation is performed by adding the VMEM offset register to the 
-	 * unsigned value of {@code virtualAddress}. The result is then truncated to 32 bits
-	 *
-	 * @param virtualAddress a 32-bit virtual address (interp as unsigned)
-	 * @return the computed 32-bit physical address as a long
-	 */
-	final long virtualToPhysicalAddress(int virtualAddress) {
-		return (Integer.toUnsignedLong(this.registers[REG_VMEM_OFFSET]) 
-			+ Integer.toUnsignedLong(virtualAddress)
-		) & 0xFFFFFFFF;
+	final boolean isRAMAddressOOB(int pAddress) {
+		long relative = uinttl(pAddress) - uinttl(this.registers[REG_VMEM_OFFSET]);
+		return relative < 0 || relative > getMemorySize();
 	}
 	
-	/**
-	 * Checks whether a virtual address lies outside the bounds of the allowed region.
-	 * @see {@link FL32REmulator#getVirtualMemorySize()}
-	 */
-	final boolean isVirtualAddressOOB(int virtualAddress) {
-		return Integer.toUnsignedLong(virtualAddress) >= getVirtualMemorySize();
-	}
-	
-	final boolean isPhysicalAddressRAM(long pAddress) {
-		return !(isPhysicalAddressROM(pAddress) || isPhysicalAddressMMIO(pAddress));
-	}
-	
-	final boolean isPhysicalAddressROM(long pAddress) {
-		return (pAddress >>> 20 == 0b111101111111);
-	}
-	
-	final boolean isPhysicalAddressMMIO(long pAddress) {
-		return (pAddress >>> 27) == 0b11111;
-	}
-	
-	final long pAddressToROMAddress(long pAddress) {
-		return pAddress & 0x000FFFFF; // mask upper 12 bits
-	}
-	
-	final int pAddressToMMIOAddress(long pAddress) {
-		return (int) (pAddress & 0x07FFFFFF); // mask upper 5 bits
-	}
-	
-	/**
-	 * Reads a single byte from virtual memory
-	 *
-	 * @param vAddress the virtual memory address to read from
-	 * @return the byte value at the specified virtual address
-	 */
-	final byte readByteMemory(int vAddress) {
-		long pAddress = virtualToPhysicalAddress(vAddress);
+	final byte readByteMemory(int pAddress) {
 		if (isPhysicalAddressMMIO(pAddress)) {
+			if (!HLP) {
+				this.raiseFault(FaultType.FAULT_PRIV);
+				return 0;
+			}
 			return mmioBus.readByte(pAddressToMMIOAddress(pAddress));
 		}
 		
 		// rom read is allowed, yk, "read only"
 		if (isPhysicalAddressROM(pAddress + 3)) { 
-			return this.readOnlyMemory.get(pAddressToROMAddress(pAddress));
+			if (!HLP) {
+				this.raiseFault(FaultType.FAULT_PRIV);
+				return 0;
+			}
+			return this.readOnlyMemory.getUInt(pAddressToROMAddress(pAddress));
 		}
 		
 		if (isPhysicalAddressRAM(pAddress)) {
 			// guarded normal accessing
-			if (this.isVirtualAddressOOB(vAddress)) {
+			if (this.isRAMAddressOOB(pAddress)) {
 				this.raiseFault(FaultType.FAULT_MEM);
 				return 0;
 			}
-			return this.memory.get(pAddress);
+			return this.memory.getUInt(pAddress);
 		}
-		return 0;
+		return 0x00;
 	}
 	
-	/**
-	 * Writes a single byte to virtual memory.
-	 * <p>
-	 * The virtual address is first checked against the VMEM bounds. If
-	 * the address is out of bounds, a memory fault is raised and the write is
-	 * ignored. Otherwise, the virtual address is translated to a physical address
-	 * using {@link #virtualToPhysicalAddress}, and the byte is written to
-	 * memory.
-	 *
-	 * @param vAddress the virtual memory address to write to
-	 * @param data     the byte value to write
-	 */
-	final void writeByteMemory(int vAddress, byte data) {
-		long pAddress = virtualToPhysicalAddress(vAddress);
-		
+	final void writeByteMemory(int pAddress, byte data) {
 		if (isPhysicalAddressMMIO(pAddress)) {
+			if (!HLP) {
+				this.raiseFault(FaultType.FAULT_PRIV);
+				return;
+			}
 			mmioBus.writeByte(pAddressToMMIOAddress(pAddress), data);
 			return;
 		}
 		
 		if (isPhysicalAddressRAM(pAddress)) {
 			// guarded normal accessing
-			if (this.isVirtualAddressOOB(vAddress)) {
+			if (this.isRAMAddressOOB(pAddress)) {
 				this.raiseFault(FaultType.FAULT_MEM);
 				return;
 			}
-			this.memory.set(pAddress, data);
+			this.memory.setUInt(pAddress, data);
 		}
 	}
 	
-	/**
-	 * Writes a 32-bit word to virtual memory in BIG-ENDIAN order
-	 *
-	 * @param vAddress the starting virtual memory address to write the word
-	 * @param data the 32-bit word to write
-	 */
-	final void writeWordMemory(int vAddress, int data) {
-		long pAddress = virtualToPhysicalAddress(vAddress);
+	final void writeWordMemory(int pAddress, int data) {
 		if (isPhysicalAddressMMIO(pAddress)) {
+			if (!HLP) {
+				this.raiseFault(FaultType.FAULT_PRIV);
+				return;
+			}
 			mmioBus.writeWord(pAddressToMMIOAddress(pAddress), data);
 			return;
 		}
 		
 		// write from the furthest so if it fault, the operation
 		// stays atomic (FL32R specs)
-		writeByteMemory(vAddress + 3, (byte) (data & 0xFF));
-		writeByteMemory(vAddress + 2, (byte) ((data >>> 8) & 0xFF));
-		writeByteMemory(vAddress + 1, (byte) ((data >>> 16) & 0xFF));
-		writeByteMemory(vAddress, (byte) ((data >>> 24) & 0xFF));
+		writeByteMemory(pAddress + 3, (byte) (data & 0xFF));
+		writeByteMemory(pAddress + 2, (byte) ((data >>> 8) & 0xFF));
+		writeByteMemory(pAddress + 1, (byte) ((data >>> 16) & 0xFF));
+		writeByteMemory(pAddress, (byte) ((data >>> 24) & 0xFF));
 	}
 	
-	/**
-	 * Reads a 32-bit word from virtual memory in BIG-ENDIAN order
-	 * <p>
-	 * Four consecutive bytes are read starting at {@code vAddress} 
-	 * and smashed into a 32-bit word.
-	 *
-	 * @param vAddress the starting virtual memory address to read from
-	 * @return the 32-bit word read from virtual memory
-	 */
-	final int readWordMemory(int vAddress) {
-		long pAddress = virtualToPhysicalAddress(vAddress);
+	final int readWordMemory(int pAddress) {
 		if (isPhysicalAddressMMIO(pAddress)) {
+			if (!HLP) {
+				return this.raiseFault(FaultType.FAULT_PRIV);
+			}
 			return mmioBus.readWord(pAddressToMMIOAddress(pAddress));
 		}
 		
 		// read from the furthest, same reason as above
-		byte lsb = readByteMemory(vAddress + 3);
-		byte mb1 = readByteMemory(vAddress + 2);
-		byte mb2 = readByteMemory(vAddress + 1);
-		byte msb = readByteMemory(vAddress);
+		byte lsb = readByteMemory(pAddress + 3);
+		byte mb1 = readByteMemory(pAddress + 2);
+		byte mb2 = readByteMemory(pAddress + 1);
+		byte msb = readByteMemory(pAddress);
 		return Utils.beBytesToInt(
 			msb, mb2, mb1, lsb
 		);
@@ -961,5 +895,9 @@ public class FL32REmulator implements GenericCPUEmulator {
 			readRegister(REG_PROGRAM_COUNTER) - 4, 
 			this.HLP
 		);
+	}
+	
+	private long uinttl(int val) {
+		return Integer.toUnsignedLong(val);
 	}
 }

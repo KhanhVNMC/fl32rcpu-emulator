@@ -12,7 +12,7 @@
 
 .define TIMER_ENABLE    1 << 0
 
-.export EXPORTED_FUNC_NAME sleep
+;.export EXPORTED_FUNC_NAME sleep
 
 @data
 string .asciz "Ball Fucking Sack"

@@ -35,6 +35,8 @@ main:
     STW     [RDX], RAX
     STW     [RBX], RCX
     LDI     RDX, 0x01 ; DISK_BUSY
+    ; you could use the CONTROL bit to make it IRQ, but fuck it
+    ; i aint gonna install a fucking irq handler for it
     wait_disk_ready:
         LDW     RBX, [R5]
         CMP     RBX, RDX
