@@ -158,8 +158,11 @@ public class FLIREmitter {
 				continue;
 			}
 		}
+		
+		System.out.println(this.collectedInstructions);
 		// final resolve, this will emit CONTEXT AWARE IR (CAIR) for the backend generation
 		this.resolveLabelAndVariableAddresses();
+		System.out.println(this.collectedInstructions);
 	}
 	
 	// DEFINE VALUES PARSING

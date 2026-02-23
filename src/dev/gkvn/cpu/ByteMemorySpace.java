@@ -30,6 +30,14 @@ public class ByteMemorySpace {
 		int offset = (int) (index % CHUNK_SIZE);
 		return chunks[chunk][offset];
 	}
+	
+	public void set32(long index, int value) {
+		checkIndex(index + 3);
+		set(index + 0, (byte) ((value >>> 24) & 0xFF));
+		set(index + 1, (byte) ((value >>> 16) & 0xFF));
+		set(index + 2, (byte) ((value >>> 8) & 0xFF));
+		set(index + 3, (byte) (value & 0xFF));
+	}
 
 	public void set(long index, byte value) {
 		checkIndex(index);

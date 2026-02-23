@@ -54,27 +54,22 @@ public class BackendCodegen {
 			}
 		});
 		code.write(cair.dataSection().dataBytes());
-		Files.write(Path.of("test.bin"), code.toByteArray());
+		Files.write(Path.of("asm/bin/test.bin"), code.toByteArray());
 		
 		byte[] boot = code.toByteArray();
-//		for (int i = 0; i < text.length; i++) {
-//			boot[i * 4 + 0] = (byte) ((text[i] >> 24) & 0xFF);
-//			boot[i * 4 + 1] = (byte) ((text[i] >> 16) & 0xFF);
-//			boot[i * 4 + 2] = (byte) ((text[i] >> 8) & 0xFF);
-//			boot[i * 4 + 3] = (byte) (text[i] & 0xFF);
-//			System.out.printf("%08X | %s\n", text[i], String.format("%32s", Integer.toBinaryString(text[i])).replace(' ', '0'));
-//		}
 		emu.loadBootROM(boot);
-		EmulatedDisplay screen = new EmulatedDisplay(emu);
-		
-		JFrame frame = new JFrame("FL32R CPU Display");
-		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-		frame.setSize(WIDTH, HEIGHT);
-		frame.add(screen);
-		frame.setVisible(true);
-		
-		new Thread(screen).start();
+//		EmulatedDisplay screen = new EmulatedDisplay(emu);
+//		
+//		JFrame frame = new JFrame("FL32R CPU Display");
+//		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+//		frame.setSize(WIDTH, HEIGHT);
+//		frame.add(screen);
+//		frame.setVisible(true);
+//		
+//		new Thread(screen).start();
+		System.out.println();
 		emu.start(false);
+		System.out.println("\n");
 		int reg[] = emu.dumpRegisters();
 		for (int i = 0; i < reg.length; i++) {
 			System.out.println("R" + i + ": 0x" + Integer.toHexString(reg[i]) + " | " + Integer.toUnsignedLong(reg[i]));

@@ -2,6 +2,7 @@ package dev.gkvn.cpu.fl32r;
 
 import static dev.gkvn.cpu.fl32r.FL32RConstants.*;
 
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Random;
@@ -11,6 +12,8 @@ import dev.gkvn.cpu.ByteMemorySpace;
 import dev.gkvn.cpu.GenericCPUEmulator;
 import dev.gkvn.cpu.fl32r.mmio.FL32RMMIO;
 import dev.gkvn.cpu.fl32r.mmio.devs.DebugConsoleMMIO;
+import dev.gkvn.cpu.fl32r.mmio.devs.DiskDriveMMIO;
+import dev.gkvn.cpu.fl32r.mmio.devs.DiskDriveMMIO.EmulatedVirtualDisk;
 import dev.gkvn.cpu.fl32r.mmio.devs.HardwareTimerMMIO;
 
 // this CPU is BIG-ENDIAN, 32-bit processor with primitive MMU
@@ -59,9 +62,18 @@ public class FL32REmulator implements GenericCPUEmulator {
 		this.readOnlyMemory = new ByteMemorySpace(ROM_SIZE); // 1 MB of ROM (for boot code)
 		this.mmioBus = new FL32RMMIO(this);
 		
-		// MMIO devices test
-		this.timer = this.mmioBus.register(new HardwareTimerMMIO(mmioBus, 0x0));
-		this.mmioBus.register(new DebugConsoleMMIO (mmioBus, 0x0 + 16));
+		// basic MMIO devices (32 bytes of registers each) test
+		this.timer = this.mmioBus.register(new HardwareTimerMMIO(mmioBus, mmioBus.allocateBasicNext()));
+		this.mmioBus.register(new DebugConsoleMMIO(mmioBus, mmioBus.allocateBasicNext()));
+		this.mmioBus.register(new DiskDriveMMIO(mmioBus, mmioBus.allocateBasicNext(), 
+			new EmulatedVirtualDisk(
+				DiskDriveMMIO.manifestEVDK(1024, "harddisk.evdk"),
+				"FL32R Ref. Emu\n\0", 
+				"Virtual ATA Disk\n\0", 
+				"00000000-00000000\n\0",
+				"BASIC v1.0\0"
+			)
+		));
 	}
 	
 	public FL32RMMIO getMmioBus() {

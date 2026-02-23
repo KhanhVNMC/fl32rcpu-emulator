@@ -1,6 +1,6 @@
 .define MMIO_BASE       0xF8000000
 .define TIMER_DEVICE    #MMIO_BASE + 0
-.define UART_DEVICE     #MMIO_BASE + 16
+.define UART_DEVICE     #MMIO_BASE + 32
 
 ; UART
 .define UART_TX_READY   #UART_DEVICE + 0x8
@@ -12,8 +12,10 @@
 
 .define TIMER_ENABLE    1 << 0
 
+.export EXPORTED_FUNC_NAME sleep
+
 @data
-string .blob "loremipsum.txt"
+string .asciz "Ball Fucking Sack"
 @text
 
 __entry__:
@@ -72,6 +74,7 @@ print:
             LDB     R4, [R7]
             CMP     R4, RZERO 
             JEQ     wait_dev_ready
+            
         JMP     print_loop
     done:
     RET

@@ -8,8 +8,6 @@ end                 .size(0)
 number     .word 36
 @text
 
-.define hello world
-
 ;JMP debug
 setuptable:
     LDI  RAX, 0x2C ; interrupt table
@@ -30,13 +28,13 @@ ok:
 table:
     LDI  RDX, 36
     ; (IRET-ish)
-    GTPC R10
+    LIPR R10
     STI
     JR   R10
 table2:
     LDI  R8, 18
     ; (IRET-ish)
-    GTPC R10
+    LIPR R10
     STI
     JR   R10
 main:

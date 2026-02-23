@@ -7,6 +7,8 @@ import dev.gkvn.cpu.fl32r.FL32RConstants;
 import dev.gkvn.cpu.fl32r.FL32REmulator;
 
 public final class FL32RMMIO {
+	private static final int MMIO_BASIC_REGION_SIZE = 32;
+	
 	protected FL32REmulator emulator;
 	private final List<MMIODevice> devices = new ArrayList<>();
 	
@@ -67,5 +69,14 @@ public final class FL32RMMIO {
 			(isWord ? "WORD" : "BYTE"), 
 			address, FL32RConstants.MMIO_REGION_START + address
 		);	
+	}
+	
+	// FOR BASIC DEVICE BLOCKS! (32 BYTES EACH)
+	private int mmioAddressCursor;
+	
+	public int allocateBasicNext() {
+	    int baseAddress = mmioAddressCursor;
+	    mmioAddressCursor += MMIO_BASIC_REGION_SIZE;
+	    return baseAddress;
 	}
 }
