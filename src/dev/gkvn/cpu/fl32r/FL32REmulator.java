@@ -547,22 +547,21 @@ public class FL32REmulator implements GenericCPUEmulator {
 				break;
 			}
 			// HLP INSTRUCTIONS (Executed by the Kernel/HLP entities)
-			case VMO: {
-				// should use HR(x) (Host-Level Privilege dedicated APRs)
-				// example:
-				// LDI  HR0, 0xCAFEBABE
-				// VMO  HR0
-				// XOR  HR0, HR0, HR0 ; for safety
-				writeRegister(REG_VMEM_OFFSET, readRegister(rDest));
+			// RECOMMENDED: should use HR(x) (Host-Level Privilege dedicated APRs)
+			case MWO: {
+				// set memory window offset
+				writeRegister(REG_MEM_WIN_OFFSET, readRegister(rOp0));
 				break;
 			}
-			case VMB: {
-				// should use HR(x) (Host-Level Privilege dedicated APRs)
-				// example:
-				// LDI  HR1, 0xFFFF
-				// VMB  HR1
-				// XOR  HR1, HR1, HR1 ; for safety
-				writeRegister(REG_VMEM_MAX_BOUND, readRegister(rDest));
+			case MWB: {
+				// set memory window bounds
+				writeRegister(REG_MEM_WIN_MAX_BOUND, readRegister(rOp0));
+				break;
+			}
+			case MWST: {
+				// combination of both
+				writeRegister(REG_MEM_WIN_OFFSET, readRegister(rOp0));
+				writeRegister(REG_MEM_WIN_MAX_BOUND, readRegister(rOp1));
 				break;
 			}
 			case HLR: {
@@ -691,8 +690,8 @@ public class FL32REmulator implements GenericCPUEmulator {
 		this.HLP = true;
 		this.interruptMask = true; // do not allow interrupts from now on
 		// resume to the full memory region (at 0x0000-HIMEM)
-		writeRegister(REG_VMEM_OFFSET, 0x00);
-		writeRegister(REG_VMEM_MAX_BOUND, 0x00);
+		writeRegister(REG_MEM_WIN_OFFSET, 0x00);
+		writeRegister(REG_MEM_WIN_MAX_BOUND, 0x00);
 		// jump to interrupt handle (HLP)
 		int irqHandleAddress = readWordMemory(vectorAddress);
 		if (irqHandleAddress == UNDEFINED_VECTOR) {
@@ -713,7 +712,7 @@ public class FL32REmulator implements GenericCPUEmulator {
 		regIndex &= 0b11111;
 		if (regIndex == REG_ZERO) return; // prevent writes to Zero reg
 		// prevent accessing a forbidden register
-		if (regIndex >= REG_VMEM_OFFSET && !HLP) {
+		if (regIndex >= REG_MEM_WIN_OFFSET && !HLP) {
 			this.raiseFault(FaultType.FAULT_PRIV);
 			return;
 		}
@@ -722,7 +721,7 @@ public class FL32REmulator implements GenericCPUEmulator {
 	
 	final int readRegister(int regIndex) {
 		regIndex &= 0b11111;
-		if (regIndex >= REG_VMEM_OFFSET && !HLP) {
+		if (regIndex >= REG_MEM_WIN_OFFSET && !HLP) {
 			// prevent accessing a forbidden register
 			this.raiseFault(FaultType.FAULT_PRIV);
 			return 0;
@@ -752,7 +751,7 @@ public class FL32REmulator implements GenericCPUEmulator {
 	}
 	
 	final long getMemorySize() {
-		int size = this.registers[REG_VMEM_MAX_BOUND];
+		int size = this.registers[REG_MEM_WIN_MAX_BOUND];
 		long physSize = this.memory.length() & 0xFFFFFFFF;
 		if (size == 0) {
 			return physSize;
@@ -761,7 +760,7 @@ public class FL32REmulator implements GenericCPUEmulator {
 	}
 	
 	final boolean isRAMAddressOOB(int pAddress) {
-		long relative = uinttl(pAddress) - uinttl(this.registers[REG_VMEM_OFFSET]);
+		long relative = uinttl(pAddress) - uinttl(this.registers[REG_MEM_WIN_OFFSET]);
 		return relative < 0 || relative > getMemorySize();
 	}
 	

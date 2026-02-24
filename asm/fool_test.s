@@ -15,9 +15,8 @@
     STB  [RAX + 3], RCX
 
     ; setup the region
-    VMO  rax   ; allow usermode memory: 0xFF -> 0xFF + 0x0F
-    VMB  rbx
+    MWST rax, rbx
     LDI  RCX, 0xFF
-    HLR  RCX ; de-escalate & jump to that region
+    HLR  RCX ; de-escalate & jump to that region (will crash immediately)
 
     

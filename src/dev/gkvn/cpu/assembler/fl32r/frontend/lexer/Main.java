@@ -9,7 +9,7 @@ import dev.gkvn.cpu.assembler.fl32r.frontend.exceptions.AsmError;
 
 public class Main {
 	public static void main(String[] args) throws Exception {
-		AsmLexer lex = new AsmLexer(Files.readString(Path.of("asm/disk.s")));
+		AsmLexer lex = new AsmLexer(Files.readString(Path.of("asm/fool_test.s")));
 		FLIREmitter p = new FLIREmitter(lex);
 		try {
 			new BackendCodegen(p.emit()).gen();

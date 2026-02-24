@@ -60,8 +60,9 @@ public enum FEOpCode {
 	RET	  (1),
 	INT	  (1, IMM24_ABS),
 	
-	VMO   (1, REG),
-	VMB   (1, REG),
+	MWO   (1, REG),
+	MWB   (1, REG),
+	MWST  (1, REG, REG),
 	HLR   (1, REG),
 	STI   (1),
 	CLI   (1),

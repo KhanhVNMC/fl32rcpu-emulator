@@ -17,8 +17,8 @@ public class FL32RSpecs {
 		Map.entry("RZERO", REG_ZERO), // the FL32R spec is retarded
 		Map.entry("RSP", REG_STACK_POINTER),
 		Map.entry("RPC", REG_PROGRAM_COUNTER),
-		Map.entry("HMO", REG_VMEM_OFFSET), 
-		Map.entry("HMB", REG_VMEM_MAX_BOUND),
+		Map.entry("HMO", REG_MEM_WIN_OFFSET), 
+		Map.entry("HMB", REG_MEM_WIN_MAX_BOUND),
 		Map.entry("HM1", REG_HLP_APR1), 
 		Map.entry("HM2", REG_HLP_APR2), 
 		Map.entry("HM3", REG_HLP_APR3),

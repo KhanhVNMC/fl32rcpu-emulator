@@ -70,9 +70,9 @@ public class CodegenTable {
 		
 		entry(INT,   jType(FL32RConstants.INT));
 		
-		entry(VMO,   rType(FL32RConstants.VMO));
-		entry(VMB,   rType(FL32RConstants.VMB));
-		entry(VMB,   rType(FL32RConstants.VMB));
+		entry(MWO,   rType(FL32RConstants.MWO));
+		entry(MWB,   rType(FL32RConstants.MWB));
+		entry(MWST,  rType(FL32RConstants.MWST));
 		entry(HLR,   rType(FL32RConstants.HLR));
 		entry(STI,   noType(FL32RConstants.STI));
 		entry(CLI,   noType(FL32RConstants.CLI));

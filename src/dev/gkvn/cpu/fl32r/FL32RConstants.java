@@ -63,29 +63,17 @@ public class FL32RConstants {
 		INT  = 0x60, // software interrupt
 		
 		// MEMORY MANAGEMENT/CPU STATE (privileged instructions starts with 0x5)
-		/*
-		 * Virtual Memory (VMEM) - Brief Documentation
-		 *
-		 * These instructions are only available to HLP (Host-Level Privilege) entities.
-		 * When VMEM is enabled, all subsequent memory accesses (load, store, stack,
-		 * jumps that reference memory, etc.) are translated relative to a protected
-		 * address range. User programs therefore see their memory starting at 0, while
-		 * the host enforces the real mem bounds
-		 *
-		 * - VMO sets the base offset. All addresses become: physical = VMO + address 
-		 * - VMB sets the maximum accessible range. Access outside the range raise a FAULT 
-		 * - Setting either value to 0 disables VMEM protection and grants full access
-		*/
-		VMO  = 0x50, // set Virtual Memory offset (0 for FULL ACCESS)
-		VMB  = 0x51, // set Virtual Memory max bound (set to 0 for FULL ACCESS)
+		MWO  = 0x50, // set Memory Window offset (0 for FULL ACCESS)
+		MWB  = 0x51, // set Memory Window max bound (set to 0 for FULL ACCESS)
+		MWST = 0x52, // Atomic version of the MWO and MWB
 		
 		// SPECIALS
-		HLR  = 0x52, // de-escalation, clear HLR and return to the address on the register
-		STI  = 0x53, // allow interrupts to happen (SeT Interrupt flag
-		CLI  = 0x54, // disallow interrupts (CLear Interrupt flag)
-		LIFR = 0x55, // copy IFR (interrupt flags register) to a GPR
-		LIPR = 0x56, // copy IPR (interrupt program counter register) to a GPR
-		STFS = 0x57, // set the current cpu flags to a packed value in a register
+		HLR  = 0x53, // de-escalation, clear HLR and return to the address on the register
+		STI  = 0x54, // allow interrupts to happen (SeT Interrupt flag
+		CLI  = 0x55, // disallow interrupts (CLear Interrupt flag)
+		LIFR = 0x56, // copy IFR (interrupt flags register) to a GPR
+		LIPR = 0x57, // copy IPR (interrupt program counter register) to a GPR
+		STFS = 0x58, // set the current cpu flags to a packed value in a register
 		NOP  = 0x00, // no-op
 		HLT  = 0x7A, // halt the cpu
 		KILL = 0x7B // kill the cpu and print debug (EMU ONLY), like HLT on FL516, on real HW, this is NO-OP
@@ -97,8 +85,8 @@ public class FL32RConstants {
 		REG_STACK_POINTER = 25,
 		REG_PROGRAM_COUNTER = 26,
 		// HLP registers (>= VMEM_OFFSET == HLP-only)
-		REG_VMEM_OFFSET = 27,
-		REG_VMEM_MAX_BOUND = 28,
+		REG_MEM_WIN_OFFSET = 27,
+		REG_MEM_WIN_MAX_BOUND = 28,
 		REG_HLP_APR1 = 29, // all-purpose-register
 		REG_HLP_APR2 = 30,
 		REG_HLP_APR3 = 31

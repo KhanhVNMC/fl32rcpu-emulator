@@ -60,8 +60,8 @@ public class FL32RCycleTable {
 		COST_TABLE[RET] = 5; // pop + jump
 
 		// VMEM/privileged
-		COST_TABLE[VMO] = 1;
-		COST_TABLE[VMB] = 1;
+		COST_TABLE[MWO] = 1;
+		COST_TABLE[MWB] = 1;
 		COST_TABLE[HLR] = 3; // set flag + jump
 
 		// SPECIALS
