@@ -4,6 +4,8 @@ import dev.gkvn.cpu.fl32r.mmio.AbstractMMIODevice;
 import dev.gkvn.cpu.fl32r.mmio.FL32RMMIO;
 
 public final class HardwareTimerMMIO extends AbstractMMIODevice {
+	public static final int TIMER_IRQ = 0x00;
+	
 	public static final int 
 		REG_COUNT_LO = 0x00,
 		REG_COUNT_HI = 0x04,
@@ -18,9 +20,7 @@ public final class HardwareTimerMMIO extends AbstractMMIODevice {
 		CTRL_IRQ_ACK = 1 << 3, // W1C: clear IRQ
 		CTRL_RESET = 1 << 4 // W1C: reset counter
 	;
-	
-	public static final int TIMER_IRQ = 0x00;
-	
+		
 	private final long startTimeNs;
 	private long compare = Long.MAX_VALUE;
 	private long period = 0;
@@ -30,7 +30,7 @@ public final class HardwareTimerMMIO extends AbstractMMIODevice {
 	
 	// microsecond timer
 	public HardwareTimerMMIO(FL32RMMIO mmio, int base) {
-		super(mmio, base, 16);
+		super(mmio, base, 32);
 		this.startTimeNs = System.nanoTime();
 	}
 

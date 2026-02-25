@@ -10,7 +10,7 @@ public final class DebugConsoleMMIO extends AbstractMMIODevice {
 	private static final int REG_STATUS = 0x08;
 
 	public DebugConsoleMMIO(FL32RMMIO mmio, int base) {
-		super(mmio, base, 16);
+		super(mmio, base, 32);
 	}
 
 	@Override

@@ -12,7 +12,7 @@ import dev.gkvn.cpu.fl32r.mmio.FL32RMMIO;
 public final class DiskDriveMMIO extends AbstractMMIODevice {
 	// disk info
 	private static final int SECTOR_SIZE = 512; // 512 bytes per sector
-	public static final int DISK_IRQ     = 0x01;
+	public  static final int DISK_IRQ    = 0x01;
 	
 	// register offsets
 	private static final int 
