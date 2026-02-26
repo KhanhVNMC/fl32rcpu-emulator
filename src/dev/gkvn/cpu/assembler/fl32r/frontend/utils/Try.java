@@ -20,6 +20,10 @@ public final class Try {
 		return absorb(body, (t) -> new AsmError(t.getMessage(), atFault));
 	}
 	
+	public static void catchAsm(Runnable body, Token atFault) {
+		absorb(() -> { body.run(); return null; }, (t) -> new AsmError(t.getMessage(), atFault));
+	}
+	
 	public static <T> T absorb(ThrowingSupplier<T> body, ExceptionMapper mapper) {
 		try {
 			return body.get();

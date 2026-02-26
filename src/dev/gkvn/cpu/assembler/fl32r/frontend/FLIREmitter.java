@@ -3,12 +3,15 @@ package dev.gkvn.cpu.assembler.fl32r.frontend;
 import static dev.gkvn.cpu.assembler.fl32r.frontend.utils.FL32RSpecs.*;
 
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import dev.gkvn.cpu.assembler.fl32r.frontend.arch.FEOpCode;
 import dev.gkvn.cpu.assembler.fl32r.frontend.arch.FEOperandType;
@@ -53,39 +56,29 @@ public class FLIREmitter {
 	// directive types
 	final static String 
 		DIRECTIVE_DEFINE = ".define",
-		DIRECTIVE_UNDEFINE = ".undef"
+		DIRECTIVE_UNDEFINE = ".undef",
+		DIRECTIVE_INCLUDE  = ".include", SUF_MODIFIER_ONCE = "once"
 	;
 	
 	// internal backed data structs
-	private AsmLexer lexer;
-	private TokenStream stream;
 	private ConstantFolder folder;
+	private LineStreamProvider provider; 
+	private Path initialPath;
 	
-	public FLIREmitter(AsmLexer lexer) {
-		this.lexer = lexer;
-		this.lexer.scanTokens();
-		this.stream = new TokenStream(this.lexer.tokens);
+	public FLIREmitter(LineStreamProvider source) {
+		this.provider = source;
 		this.folder = new ConstantFolder(defineValues);
+		// ofc, otherwise bullfuckingshit like ".include "self" once" will
+		// cause the file to be shaded twice
+		this.includeOnceSeen.add(this.initialPath = source.getInitial().getSourcePath());
 	}
-	
-	public List<TokenStream> lineTokens = new ArrayList<>();
-	
+		
 	public FrontendCAIR emit() throws AsmError {
-		// loop until the token stream is exhausted or EOF
-		while (!stream.isAtEnd() && !stream.consumeIfMatch(TokenType.EOF)) {
-			List<Token> line = new ArrayList<>();
-			// turn each line into its own token stream
-			while (!stream.consumeIfMatch(TokenType.NEWLINE)) {
-				Token next = stream.peek();
-				if (next.type() == TokenType.EOF) {
-					break; // do not consume EOF, break to the outer loop
-				}
-				line.add(next);
-				stream.advance();
-			}
-			lineTokens.add(new TokenStream(line)); // accumulates
-		}
 		this.parseLines();
+		
+		// this will emit CONTEXT AWARE IR (CAIR) for the backend generation
+		this.resolveLabelAndVariableAddresses();
+		
 		// box the results and return for codegen
 		return new FrontendCAIR(
 			collectedInstructions, // instruction (text)
@@ -99,17 +92,21 @@ public class FLIREmitter {
 	// result of the IR emitter is here
 	private List<Instruction> collectedInstructions = new ArrayList<>();
 	ByteArrayOutputStream dataSectionBytes = new ByteArrayOutputStream();
-	
 	// bookkeeping and result
 	private ParsingContext context = ParsingContext.NONE;
 	private Map<String, LabelText> labelAddresses = new HashMap<>();
-	
 	// define values
 	private Map<String, DefineValue> defineValues = new HashMap<>();
 	
-	private void parseLines() throws AsmError {		
-		for (TokenStream line : lineTokens) {
-			if (line.isEmpty()) continue;
+	/**
+	 * Begins parsing until the provider is exhausted.
+	 * @throws AsmError when shit hits the fan
+	 */
+	private void parseLines() throws AsmError {	
+		while (!provider.isExhausted()) {
+			TokenStream line = provider.nextLine();
+			if (line == null || line.isEmpty()) continue;
+			
 			Token first = line.peek();
 			// switch context on directive
 			if (first.type() == TokenType.DIRECTIVE_SECTION) {
@@ -128,12 +125,9 @@ public class FLIREmitter {
 			}
 			if (first.type() == TokenType.DIRECTIVE) {
 				switch (first.literal()) {
-					case DIRECTIVE_DEFINE -> {
-						this.parseDefineValue(line);
-					}
-					case DIRECTIVE_UNDEFINE -> {
-						this.parseUndefineValue(line);
-					}
+					case DIRECTIVE_DEFINE -> this.parseDefineValue(line);
+					case DIRECTIVE_UNDEFINE -> this.parseUndefineValue(line);
+					case DIRECTIVE_INCLUDE -> this.parseInclude(line);
 					default -> {
 						throw new AsmError("Unknown directive type", first);
 					}
@@ -158,9 +152,67 @@ public class FLIREmitter {
 				continue;
 			}
 		}
+	}
+	
+	private Set<Path> includeOnceSeen = new HashSet<>();
+	// INCLUDE PARSING (shit)
+	private void parseInclude(TokenStream line) {
+		line.advance(); // consume the `.include`
+		if (line.length() == 1) {
+			throw new AsmError(
+				"Expected a file name after .include (e.g. '.include \"file.asm\"')", 
+				line.peekNotNull()
+			);
+		}
+
+		Token sourceTok = line.advance();
+		if (sourceTok.type() != TokenType.STRING) {
+			throw new AsmError(
+				"Expected a file name after .include (e.g. '.include \"file.asm\"')", 
+				sourceTok
+			);
+		}
 		
-		// final resolve, this will emit CONTEXT AWARE IR (CAIR) for the backend generation
-		this.resolveLabelAndVariableAddresses();
+		// allows for pragma once typa shit
+		boolean once = false;
+		if (!line.isAtEnd()) {
+			Token suffix = line.advance();
+			if (suffix.type() == TokenType.IDENTIFIER 
+			 && suffix.literal().equals(SUF_MODIFIER_ONCE)
+			) {
+				once = true;
+			} else {
+				throw new AsmError("Unexpected tokens after .include directive", suffix);
+			}
+		}
+		
+		// resolve the files in a very stupid way
+		String fileName = sourceTok.literal().substring(1, sourceTok.literal().length() - 1);
+		Path includePath = initialPath.getParent().resolve(fileName).normalize();
+		// dont make a lexer for already resolved entries, period
+		if (once && includeOnceSeen.contains(includePath)) {
+			return;
+		}
+		AsmLexer lexer;
+		try {
+			lexer = new AsmLexer(includePath, Files.readString(includePath));
+		} catch (IOException e) {
+			throw new AsmError(sourceTok, 
+				"Failed to read include file: %s (%s)", 
+				includePath, e.getClass().getName()
+			);
+		}
+		
+		final boolean includeOnce = once;
+		Try.catchAsm(() -> {
+			if (includeOnce) {
+				this.includeOnceSeen.add(includePath);
+				this.provider.pushSource(lexer);
+				return;
+			}
+			// subject to circular checks
+			this.provider.pushSource(lexer);
+		}, sourceTok);
 	}
 	
 	// DEFINE VALUES PARSING
@@ -200,6 +252,10 @@ public class FLIREmitter {
 		this.defineValues.put(name, Try.absorbAsm(() -> new DefineValue(
 			next, folder.foldExpression(line)
 		), line.peekNotNull()));
+		
+		if (!line.isAtEnd()) {
+			throw new AsmError("Unexpected tokens after .define directive", line.peek());
+		}
 	}
 	
 	public void parseUndefineValue(TokenStream line) {
@@ -217,6 +273,9 @@ public class FLIREmitter {
 				"Expected a defined symbol name after .undef (e.g. '.undef FOO')", 
 				nameTok
 			);
+		}
+		if (!line.isAtEnd()) {
+			throw new AsmError("Unexpected tokens after .undef directive", line.peek());
 		}
 		
 		String name = nameTok.literal();
@@ -405,7 +464,7 @@ public class FLIREmitter {
 	}
 	
 	private void emitIntBE(int value, int size) {
-		for (int i = size - 1; i >= 0; i--) {
+		for (int i = size - 1; i >= 0; i--) { // java moment
 			dataSectionBytes.write((int) (urshift(value, (i * 8) & 0xFF)));
 		}
 	}

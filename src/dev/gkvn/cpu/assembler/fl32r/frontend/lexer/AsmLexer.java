@@ -1,12 +1,14 @@
 package dev.gkvn.cpu.assembler.fl32r.frontend.lexer;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
 public class AsmLexer {
 	private final String source;
-	public final String[] sourceLines;
-	public final List<Token> tokens = new ArrayList<>();
+	private final String[] sourceLines;
+	private final List<Token> tokens = new ArrayList<>();
+	private final Path sourcePath;
 
 	// bookkeeping
 	private int start = 0; // the beginning of a token
@@ -16,12 +18,21 @@ public class AsmLexer {
 	private int column = 0;
 
 	// assign a source for this lexer
-	public AsmLexer(String source) {
+	public AsmLexer(Path path, String source) {
 		this.source = source;
+		this.sourcePath = path;
 		this.sourceLines = source.split("\\R", -1);
 	}
+	
+	public String getSourceAtLine(int line) {
+		return sourceLines[line];
+	}
+	
+	public Path getSourcePath() {
+		return sourcePath;
+	}
 
-	public void scanTokens() {
+	public List<Token> scanTokens() {
 		// loop until the thing has not ended, if not ended, assign the
 		// current char index to the current one, and then scan the token
 		while (!isAtEnd()) {
@@ -31,7 +42,12 @@ public class AsmLexer {
 		}
 		
 		// end of file
-		tokens.add(new Token(TokenType.EOF, "", line, column));
+		tokens.add(new Token(this, TokenType.EOF, "", line, column));
+		return tokens;
+	}
+	
+	public List<Token> getTokens() {
+		return tokens;
 	}
 	
 	private void scanToken() {
@@ -118,7 +134,7 @@ public class AsmLexer {
 				} else if (isAlpha(c)) { // if found char, handle identifier
 					identifier();
 				} else {
-					throw new RuntimeException("Unexpected character: " + c); // TODO
+					//throw new RuntimeException("Unexpected character: " + c); // TODO
 				}
 			}
 		}
@@ -276,7 +292,7 @@ public class AsmLexer {
 	private void addToken(TokenType type) {
 		// "start" is the beginning of a token (set at each interval of scanTokens())
 		String literal = source.substring(start, current);
-		tokens.add(new Token(type, literal, line, startColumn));
+		tokens.add(new Token(this, type, literal, line, startColumn));
 	}
 
 	/**

@@ -4,24 +4,26 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 import dev.gkvn.cpu.assembler.fl32r.backend.BackendCodegen;
+import dev.gkvn.cpu.assembler.fl32r.frontend.LineStreamProvider;
 import dev.gkvn.cpu.assembler.fl32r.frontend.FLIREmitter;
 import dev.gkvn.cpu.assembler.fl32r.frontend.exceptions.AsmError;
 
 public class Main {
 	public static void main(String[] args) throws Exception {
-		AsmLexer lex = new AsmLexer(Files.readString(Path.of("asm/fool_test.s")));
-		FLIREmitter p = new FLIREmitter(lex);
+		Path pt = Path.of("asm/fool_test.s");
+		AsmLexer lex = new AsmLexer(pt, Files.readString(pt));
+		FLIREmitter p = new FLIREmitter(new LineStreamProvider(lex));
 		try {
 			new BackendCodegen(p.emit()).gen();
 		} catch (AsmError e) {
-			reportError(lex, e);
+			reportError(e);
 		}
 	}
 	
-	private static void reportError(AsmLexer lex, AsmError e) {
+	private static void reportError(AsmError e) {
 		Token t = e.token;
-		System.err.println("[ASM ERROR!] " + e.getMessage() + " at line " + (t.line() + 1) + ", column " + t.column());
-		System.err.println("" + lex.sourceLines[t.line()]);
+		System.err.println("[ASM ERROR!] " + e.getMessage() + " in \"" + t.lexer().getSourcePath() + "\" at line " + (t.line() + 1) + ", column " + t.column());
+		System.err.println("" + t.lexer().getSourceAtLine(t.line()));
 		System.err.println("~".repeat(t.column()) + "^");
 	}
 }

@@ -18,10 +18,11 @@ public interface GenericCPUEmulator {
 	void addBreakpointPhysical(long physicalAddresss);
 	void removeBreakpointPhysical(long physicalAddresss);
 	boolean[] dumpFlags();	
+	int[] dumpRegisters();
 	ByteMemorySpace getMemory();
 	ByteMemorySpace getReadOnlyMemory(); // ROM
 	boolean isStarted();
-	boolean isKilled();
+	boolean isKilled(); // what
 	default boolean isCPUAvailable() {
 		return isStarted() && !isKilled();
 	}

@@ -1,6 +1,7 @@
 .define MMIO_BASE       0xF8000000
 .define UART_DEVICE     #MMIO_BASE + 32 
 .define DISK_DEVICE     #MMIO_BASE + 64 
+.define BALLS 0x7B
 
 ; UART
 .define UART_TX_READY   #UART_DEVICE + 0x8
