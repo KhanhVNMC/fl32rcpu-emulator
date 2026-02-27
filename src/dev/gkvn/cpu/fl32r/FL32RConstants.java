@@ -131,4 +131,37 @@ public class FL32RConstants {
 		HARDWARE_INT_COUNT = 12,
 		HARDWARE_INT_END = HARDWARE_INT_BASE + (WORD_SIZE * HARDWARE_INT_COUNT) - WORD_SIZE;
 	;
+	
+	public static final int[] EGA_COLOR = { 
+		0x000000, // 0 black
+		0x0000AA, // 1 blue
+		0x00AA00, // 2 green
+		0x00AAAA, // 3 cyan
+		0xAA0000, // 4 red
+		0xAA00AA, // 5 magenta
+		0xAA5500, // 6 brown
+		0xAAAAAA, // 7 light gray
+		0x555555, // 8 dark gray
+		0x5555FF, // 9 light blue
+		0x55FF55, // 10 light green
+		0x55FFFF, // 11 light cyan
+		0xFF5555, // 12 light red
+		0xFF55FF, // 13 light magenta
+		0xFFFF55, // 14 yellow
+		0xFFFFFF // 15 white
+	};
+	
+	public static int[] VGA_STD_PALETTE = new int[256];
+	static {
+		System.arraycopy(EGA_COLOR, 0, VGA_STD_PALETTE, 0, 16);
+		int idx = 16;
+		int[] steps = { 0x00, 0x33, 0x66, 0x99, 0xCC, 0xFF }; // what the f (0x33 * i)
+		for (int r = 0; r < 6; r++) {
+			for (int g = 0; g < 6; g++) {
+				for (int b = 0; b < 6; b++) {
+					VGA_STD_PALETTE[idx++] = (steps[r] << 16) | (steps[g] << 8) | steps[b];
+				}
+			}
+		}
+	}
 }
