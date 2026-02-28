@@ -8,12 +8,9 @@
 .define CURSOR_CONTROL  #VGA_BASE + 0x20
 .define TEXT_VRAM_BASE  #VGA_BASE + 0xF0 + 0x258000
 
-.include "test_a.s" once
-.include "test.s" once
-.include "disk.s" once
 
 @text
-
+BALLS
 __entry__:
     LDI     RAX, #VIDEO_CONTROL
     LDI     RBX, 0b01 ; VBLANKIRQ|ENABLE

@@ -36,8 +36,12 @@ public class Main {
 			System.err.println("Error: No input file specified. Use -i <file>");
 			return;
 		}
+		Path pt = Path.of(inputPath);
+		if (!Files.exists(pt)) {
+			System.err.println("Error: Input file '" + pt + "' not found. Please try again.");
+			return;
+		}
 		try {
-			Path pt = Path.of(inputPath);
 			String source = Files.readString(pt);
 			AsmLexer lex = new AsmLexer(pt, source);
 			FLIREmitter emitter = new FLIREmitter(new LineStreamProvider(lex));
@@ -80,13 +84,13 @@ public class Main {
 	}
 
 	private static void printHelp() {
-		System.out.println("FL32R Assembler (flasm)");
+		System.out.println("FL32R Reference Assembler And Virtual Machine (flasm)");
 		System.out.println("Usage: flasm -i <input.s> [options]");
 		System.out.println("Options:");
 		System.out.println("  -i <file>       Input assembly file");
 		System.out.println("  -o <file>       Output binary (default: out.bin)");
 		System.out.println("  --dump-cair     Print Context-Aware IR for debugging");
-		System.out.println("  --start-vm      Start the FL32R Virtual Machine");
+		System.out.println("  --start-vm      Start the FL32R VM after assembling");
 		System.out.println("  -h, --help      Show this help message");
 	}
 
