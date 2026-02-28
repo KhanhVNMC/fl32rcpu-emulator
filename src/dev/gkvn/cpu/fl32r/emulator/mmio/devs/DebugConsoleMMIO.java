@@ -11,6 +11,7 @@ public final class DebugConsoleMMIO extends AbstractMMIODevice {
 
 	public DebugConsoleMMIO(FL32RMMIO mmio, int base) {
 		super(mmio, base, 32);
+		System.out.println("======= UART CONSOLE OUTPUT =======");
 	}
 
 	@Override

@@ -50,8 +50,8 @@ public class FL32REmulator implements GenericCPUEmulator {
 	
 	public FL32REmulator(long memorySize) {
 		// clamp memorySize to 32-bit unsigned max
-		if (memorySize < 0 || memorySize > 0xFFFFFFFFL) {
-			throw new IllegalArgumentException("Memory size must be 0 -> 4GB");
+		if (memorySize < 256 || memorySize > RAM_WINDOW_END + 1) {
+			throw new IllegalArgumentException("Memory size must be 256 -> " + (RAM_WINDOW_END + 1) + " bytes");
 		}
 		this.setFrequencyHz(32_000_000); // 32 MHZ cpu
 		this.memory = new ByteMemorySpace(memorySize);
@@ -615,7 +615,7 @@ public class FL32REmulator implements GenericCPUEmulator {
 			}
 			// Kills the cpu immediately (emulator-only instruction)
 			case KILL: { 
-				//if (!this.HLP) raiseFault(FaultType.FAULT_PRIV);
+				if (!this.HLP) raiseFault(FaultType.FAULT_PRIV);
 				this.kill();
 				break;
 			}

@@ -8,6 +8,10 @@
 .define CURSOR_CONTROL  #VGA_BASE + 0x20
 .define TEXT_VRAM_BASE  #VGA_BASE + 0xF0 + 0x258000
 
+.include "test_a.s" once
+.include "test.s" once
+.include "disk.s" once
+
 @text
 
 __entry__:
@@ -29,7 +33,7 @@ __entry__:
     STW     [RAX], RBX
     
     LDI     RAX, #TEXT_VRAM_BASE + 4
-    LDI     RBX, (0 << 25) | (0 << 24) | ((15 % 16) << 8) | ('i' % 256)
+    LDI     RBX, (0 << 25) | (0 << 24) | ((11 % 16) << 8) | ('i' % 256)
     STW     [RAX], RBX
 
     LDI     RAX, #TEXT_VRAM_BASE + 8
@@ -39,6 +43,8 @@ __entry__:
     LDI     RAX, #CURSOR_X ; move the cursor to x=3 (with x0=0)
     LDI     RBX, 3
     STW     [RAX], RBX
+
+    KILL
 
     SPIN:
     JMP SPIN ; prevents it from shutting down

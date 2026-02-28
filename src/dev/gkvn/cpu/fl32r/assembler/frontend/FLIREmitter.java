@@ -75,9 +75,7 @@ public class FLIREmitter {
 		
 	public FrontendCAIR emit() throws AsmError {
 		this.parseLines();
-		
-		System.out.println(this.collectedInstructions);
-		
+				
 		// this will emit CONTEXT AWARE IR (CAIR) for the backend generation
 		this.resolveLabelAndVariableAddresses();
 		
@@ -237,9 +235,10 @@ public class FLIREmitter {
 		
 		String name = nameTok.literal();
 		if (defineValues.containsKey(name)) {
+			Token definedAt = defineValues.get(name).owner();
 			throw new AsmError(nameTok,
-				"Defined symbol '%s' already defined on line %d.",
-				name, defineValues.get(name).owner().line()
+				"Symbol '%s' already defined at line %d in '%s'",
+				name, definedAt.line() + 1, definedAt.lexer().getSourcePath()
 			);
 		}
 		
@@ -311,9 +310,10 @@ public class FLIREmitter {
 		}
 		String name = nameTok.literal();
 		if (dataSymbols.containsKey(name)) {
+			Token definedAt = dataSymbols.get(name).owner();
 			throw new AsmError(nameTok,
-				"Data symbol '%s' already defined on line %d.",
-				dataSymbols.get(name).owner().line()
+				"Data symbol '%s' already defined at line %d in '%s'",
+				name, definedAt.line() + 1, definedAt.lexer().getSourcePath()
 			);
 		}
 		
@@ -479,9 +479,10 @@ public class FLIREmitter {
 			String labelName = line.previous().literal(); // name
 			LabelText label = labelAddresses.get(labelName);
 			if (label != null) {
-				throw new AsmError(
-					"Label already defined at line " + label.owner().line() + "!", 
-					line.previous()
+				Token definedAt = label.owner();
+				throw new AsmError(line.previous(),
+					"Label '%s' already defined at line %d in '%s'",
+					label, definedAt.line() + 1, definedAt.lexer().getSourcePath()
 				);
 			}
 			// collect the token for error reporting too

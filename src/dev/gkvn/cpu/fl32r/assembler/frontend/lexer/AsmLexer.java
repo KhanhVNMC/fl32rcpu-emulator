@@ -25,7 +25,7 @@ public class AsmLexer {
 	}
 	
 	public String getSourceAtLine(int line) {
-		return sourceLines[line];
+		return (line < 0 || line >= sourceLines.length) ? null : sourceLines[line];
 	}
 	
 	public Path getSourcePath() {
