@@ -14,6 +14,7 @@ import dev.gkvn.cpu.fl32r.mmio.devs.DebugConsoleMMIO;
 import dev.gkvn.cpu.fl32r.mmio.devs.DiskDriveMMIO;
 import dev.gkvn.cpu.fl32r.mmio.devs.DiskDriveMMIO.EmulatedVirtualDisk;
 import dev.gkvn.cpu.fl32r.mmio.devs.HardwareTimerMMIO;
+import dev.gkvn.cpu.fl32r.mmio.devs.VGAGraphicsMMIO;
 
 // this CPU is BIG-ENDIAN, 32-bit processor with primitive MMU
 // FL32RCPU -> Fixed Length 32-bit RISC CPU
@@ -72,6 +73,7 @@ public class FL32REmulator implements GenericCPUEmulator {
 				"BASIC v1.0\0"
 			)
 		));
+		this.mmioBus.register(new VGAGraphicsMMIO(mmioBus, mmioBus.allocateBasicNext()));
 	}
 	
 	public FL32RMMIO getMmioBus() {

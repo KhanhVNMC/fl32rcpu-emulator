@@ -76,6 +76,8 @@ public class FLIREmitter {
 	public FrontendCAIR emit() throws AsmError {
 		this.parseLines();
 		
+		System.out.println(this.collectedInstructions);
+		
 		// this will emit CONTEXT AWARE IR (CAIR) for the backend generation
 		this.resolveLabelAndVariableAddresses();
 		

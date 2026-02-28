@@ -10,7 +10,7 @@ public enum TokenType {
 	DIRECTIVE, // .directive 
 	DIRECTIVE_SECTION, // @data, @text
 	VAR, // $var
-	PLUS, MINUS, STAR, SLASH, MOD, BSR, BSL, // +-*/
+	PLUS, MINUS, STAR, SLASH, MOD, BSR, BSL, AND, OR, XOR, NOT, // +-*/>><<&|^~
 	LSQUARE, // [
 	RSQUARE, // ]
 	LPAREN, // (

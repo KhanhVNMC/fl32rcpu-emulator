@@ -19,7 +19,22 @@ public class ConstantFolder {
 	}
 	
 	public int foldExpression(TokenStream stream) throws FrontendSolveError {
-		return parseBitShifting(stream);
+		return parseBitwiseOperations(stream);
+	}
+	
+	private int parseBitwiseOperations(TokenStream stream) throws FrontendSolveError {
+		int lvalue = parseBitShifting(stream);
+		while (stream.consumeIfMatch(TokenType.AND, TokenType.OR, TokenType.XOR)) {
+			Token op = stream.previous();
+			int rvalue = parseBitShifting(stream);
+			lvalue = switch (op.type()) {
+				case AND -> lvalue & rvalue;
+				case OR -> lvalue | rvalue;
+				case XOR -> lvalue ^ rvalue;
+				default -> throw new AssertionError();
+			};
+		}
+		return lvalue;
 	}
 	
 	private int parseBitShifting(TokenStream stream) throws FrontendSolveError {
@@ -70,6 +85,7 @@ public class ConstantFolder {
 	private int parseUnary(TokenStream stream) throws FrontendSolveError {
 		if (stream.consumeIfMatch(TokenType.PLUS)) return parseUnary(stream);
 		if (stream.consumeIfMatch(TokenType.MINUS)) return -parseUnary(stream);
+		if (stream.consumeIfMatch(TokenType.NOT)) return ~parseUnary(stream);
 		return parsePrimary(stream);
 	}
 	

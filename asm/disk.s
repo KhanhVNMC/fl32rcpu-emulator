@@ -18,6 +18,13 @@
 .define DISK_DMA_ADDR   #DISK_DEVICE + 0x18
 .define DISK_DMA_LEN    #DISK_DEVICE + 0x1C
 
+.ifdef STUFF
+    .define ANOTHER_THING 2
+.else
+    .define ANOTHER_THING 1
+.endif
+
+
 @text
 ; i know we could use [Reg + offset] so we dont need so many LDIs
 ; but eh.

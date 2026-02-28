@@ -49,7 +49,7 @@ public abstract class AbstractMMIODevice implements MMIODevice {
 		return mmio.emulator;
 	}
 	
-	public void interrupt(int code) {
+	public synchronized void interrupt(int code) {
 		mmio.emulator.hardwareIRQ(code);
 	}
 }

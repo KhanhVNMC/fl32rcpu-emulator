@@ -87,6 +87,18 @@ public class AsmLexer {
 			case '%':
 				addToken(TokenType.MOD);
 				break;
+			case '&':
+				addToken(TokenType.AND);
+				return;
+			case '|':
+				addToken(TokenType.OR);
+				return;
+			case '^':
+				addToken(TokenType.XOR);
+				return;
+			case '~':
+				addToken(TokenType.NOT);
+				return;
 			case '>':
 				if (match('>')) {
 					addToken(TokenType.BSR);

@@ -10,7 +10,7 @@ import dev.gkvn.cpu.assembler.fl32r.frontend.exceptions.AsmError;
 
 public class Main {
 	public static void main(String[] args) throws Exception {
-		Path pt = Path.of("asm/fool_test.s");
+		Path pt = Path.of("asm/vga.s");
 		AsmLexer lex = new AsmLexer(pt, Files.readString(pt));
 		FLIREmitter p = new FLIREmitter(new LineStreamProvider(lex));
 		try {
