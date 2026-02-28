@@ -1,0 +1,13 @@
+package dev.gkvn.cpu.fl32r.emulator;
+
+public enum FaultType {
+	FAULT_MEM, 
+	FAULT_PRIV, 
+	FAULT_ILLEGAL,
+	FAULT_DIVZERO, 
+	FAULT_STACK_OVERFLOW, 
+	FAULT_STACK_UNDERFLOW, 
+	FAULT_OVERFLOW,
+	FAULT_EXEC,
+	TRAP_BREAKPOINT
+}

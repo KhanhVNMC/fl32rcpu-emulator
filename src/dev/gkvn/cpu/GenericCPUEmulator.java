@@ -1,5 +1,7 @@
 package dev.gkvn.cpu;
 
+import dev.gkvn.cpu.utils.ByteMemorySpace;
+
 /**
  * I will make this a bare class, fuck documentation.
  */

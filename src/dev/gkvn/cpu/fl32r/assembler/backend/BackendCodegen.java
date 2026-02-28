@@ -1,0 +1,75 @@
+package dev.gkvn.cpu.fl32r.assembler.backend;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
+import dev.gkvn.cpu.fl32r.assembler.backend.isa.CodegenTable;
+import dev.gkvn.cpu.fl32r.assembler.frontend.FrontendCAIR;
+import dev.gkvn.cpu.fl32r.emulator.FL32REmulator;
+import dev.gkvn.cpu.utils.Calc;
+
+public class BackendCodegen {
+	private FrontendCAIR cair;
+	private ByteArrayOutputStream code;
+	
+	public BackendCodegen(FrontendCAIR cair) {
+		this.cair = cair;
+		this.code = new ByteArrayOutputStream();
+	}
+	
+	public void emit(int value) {
+		String binary = String.format("%32s", Integer.toBinaryString(value)).replace(' ', '0');
+		StringBuilder sb = new StringBuilder(binary);
+		sb.insert(8, '|');
+		System.out.println("emitted " + sb);
+		code.write((value >>> 24) & 0xFF);
+		code.write((value >>> 16) & 0xFF);
+		code.write((value >>> 8) & 0xFF);
+		code.write(value & 0xFF);
+	}
+	
+	private static final int WIDTH = 640;
+	private static final int HEIGHT = 480;
+	public void gen() throws IOException {
+		FL32REmulator emu = new FL32REmulator(Calc.GB(0.1));
+		emu.setFrequencyHz(1_000_000); // 1MHZ cpu
+		this.cair.instructions().forEach(i -> {
+			var a = CodegenTable.getRuleFor(i.opcode);
+			if (a == null) {
+				System.out.print(i + " -> ");
+				System.out.println("unimplemented");
+				throw new RuntimeException("unimpl");
+			}
+			System.out.print(i + " -> ");
+			try {
+				a.accept(this, i);
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		});
+		code.write(cair.dataSection().dataBytes());
+		Files.write(Path.of("asm/bin/test.bin"), code.toByteArray());
+		
+		byte[] boot = code.toByteArray();
+		emu.loadBootROM(boot);
+//		EmulatedDisplay screen = new EmulatedDisplay(emu);
+//		
+//		JFrame frame = new JFrame("FL32R CPU Display");
+//		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+//		frame.setSize(WIDTH, HEIGHT);
+//		frame.add(screen);
+//		frame.setVisible(true);
+//		
+//		new Thread(screen).start();
+		System.out.println();
+		emu.start(false);
+		System.out.println("\n");
+		int reg[] = emu.dumpRegisters();
+		for (int i = 0; i < reg.length; i++) {
+			System.out.println("R" + i + ": 0x" + Integer.toHexString(reg[i]) + " | " + Integer.toUnsignedLong(reg[i]));
+		}
+		//Files.write(Path.of("dump.bin"), emu.dumpMemory().inner.chunks[0]);
+	}
+}
