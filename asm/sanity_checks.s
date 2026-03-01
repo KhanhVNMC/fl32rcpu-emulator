@@ -47,7 +47,7 @@ _vga_entry:
     STW     [RAX], R10
 
     LDI     RCX, #SOC_CTRL_BASE
-    LDI     RAX, 1 << 1
+    LDI     RAX, 1 << 0 ; power off the platform
     STB     [RCX], RAX
 
     SPIN:
