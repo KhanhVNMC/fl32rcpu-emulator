@@ -1,7 +1,11 @@
 package dev.gkvn.cpu.fl32r.emulator.mmio.devs;
 
+import java.awt.Color;
 import java.awt.Dimension;
+import java.awt.Font;
+import java.awt.FontMetrics;
 import java.awt.Graphics;
+import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -20,6 +24,7 @@ import dev.gkvn.cpu.utils.ByteMemorySpace;
 public final class VGAGraphicsMMIO extends AbstractMMIODevice {	
 	public static final int WIDTH = 640, HEIGHT = 480;
 	public static byte FONT_GLYPHS[] = null;
+	public static BufferedImage NO_SIGNAL_SCREEN = noSignalImage();
 	
 	// burh
 	static {
@@ -105,8 +110,9 @@ public final class VGAGraphicsMMIO extends AbstractMMIODevice {
 	private volatile boolean vblank = false;
 	private volatile boolean blinkOn = true;
 	
-	public VGAGraphicsMMIO(FL32RMMIO mmio, int base) {
-		super(mmio, base, 44 + VRAM_SIZE);	
+	public static final int MEMORY_MAP_SIZE = 4 * 1024 * 1024;
+	public VGAGraphicsMMIO(FL32RMMIO mmio) {
+		super(mmio, FL32RMMIO.MMIO_REGION_SIZE - MEMORY_MAP_SIZE, MEMORY_MAP_SIZE);	
 		// default palette
 		System.arraycopy(FL32RConstants.VGA_STD_PALETTE, 0, palette, 0, 256);
 		
@@ -118,8 +124,15 @@ public final class VGAGraphicsMMIO extends AbstractMMIODevice {
 			@Override
 			protected void paintComponent(Graphics g) {
 				super.paintComponent(g);
-				if (!videoEnable) return;
-				g.drawImage(image, 0, 0, getWidth(), getHeight(), null);
+				Graphics2D g2 = (Graphics2D) g;
+				int w = getWidth();
+				int h = getHeight();
+				if (!videoEnable) {
+					// fake no signal, for shit and giggles
+					g2.drawImage(NO_SIGNAL_SCREEN, 0, 0, w, h, null);
+					return;
+				}
+				g2.drawImage(image, 0, 0, w, h, null);
 			}
 		};
 		panel.setPreferredSize(new Dimension(640, 480));
@@ -314,4 +327,20 @@ public final class VGAGraphicsMMIO extends AbstractMMIODevice {
 		}		
 	}
 	
+	static final BufferedImage noSignalImage() {
+	    BufferedImage img = new BufferedImage(WIDTH, HEIGHT, BufferedImage.TYPE_INT_RGB);
+	    Graphics2D g = img.createGraphics();
+	    g.setColor(new Color(0, 0, 128));
+	    g.fillRect(0, 0, WIDTH, HEIGHT);
+	    String text = "NO SIGNAL";
+	    Font font = new Font("SansSerif", Font.BOLD, 48);
+	    g.setFont(font);
+	    g.setColor(Color.RED);
+	    FontMetrics fm = g.getFontMetrics();
+	    int x = (WIDTH - fm.stringWidth(text)) / 2;
+	    int y = (HEIGHT - fm.getHeight()) / 2 + fm.getAscent();
+	    g.drawString(text, x, y);
+	    g.dispose();
+	    return img;
+	}
 }

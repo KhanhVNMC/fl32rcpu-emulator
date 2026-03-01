@@ -30,7 +30,7 @@ public final class HardwareTimerMMIO extends AbstractMMIODevice {
 	
 	// microsecond timer
 	public HardwareTimerMMIO(FL32RMMIO mmio, int base) {
-		super(mmio, base, 32);
+		super(mmio, base, FL32RMMIO.MMIO_BASIC_REGION_SIZE);
 		this.startTimeNs = System.nanoTime();
 	}
 

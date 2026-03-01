@@ -62,7 +62,7 @@ public final class DiskDriveMMIO extends AbstractMMIODevice {
 	private int regDMALength;
 
 	public DiskDriveMMIO(FL32RMMIO mmio, int base, EmulatedVirtualDisk evdk) {
-		super(mmio, base, 32);
+		super(mmio, base, FL32RMMIO.MMIO_BASIC_REGION_SIZE);
 		Path host = evdk.backingFile();
 		// initial checks (evdk format)
 		if (evdk.brand().length() > 16) {

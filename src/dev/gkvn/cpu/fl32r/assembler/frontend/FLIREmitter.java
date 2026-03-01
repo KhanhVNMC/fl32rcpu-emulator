@@ -482,7 +482,8 @@ public class FLIREmitter {
 				Token definedAt = label.owner();
 				throw new AsmError(line.previous(),
 					"Label '%s' already defined at line %d in '%s'",
-					label, definedAt.line() + 1, definedAt.lexer().getSourcePath()
+					label.name(), definedAt.line() + 1, 
+					definedAt.lexer().getSourcePath()
 				);
 			}
 			// collect the token for error reporting too
@@ -581,13 +582,13 @@ public class FLIREmitter {
 								);
 							}
 							throw new AsmError(
-								"Expected a defined variable/const or a label",
+								"Expected a defined variable (@data) or a label",
 								varToken
 							);
 						}
 						// normal case (not V&L)
 						throw new AsmError(
-							"Expected a defined variable/const",
+							"Expected a defined variable (@data)",
 							varToken
 						);
 					}
@@ -704,7 +705,7 @@ public class FLIREmitter {
 		this.collectPC += instruction.getSize();
 	}
 	
-	// FINALIZE (we dont have a linker so this is the final result)
+	// FINALIZE (we dont have a linker so this is the linker (bruh))
 	private void resolveLabelAndVariableAddresses() {
 		int resolvePC = 0; // 2nd pass PC
 		for (var instruction : this.collectedInstructions) {
@@ -757,7 +758,11 @@ public class FLIREmitter {
 					// note: only allow to dissolve to a memory operand
 					// if the operand type is a real "variable"
 					// ex: LD  R0, $variable
-					if (operandType == FEOperandType.VARIABLE && ivar.pcRelative()) {
+					// or even: LEA R0, $variable[1]
+					if ((operandType == FEOperandType.VARIABLE_OR_LABEL || 
+						 operandType == FEOperandType.VARIABLE
+					   ) && ivar.pcRelative()
+					) {
 						// compute the pc relative for actual pc rel operands (and variable)
 						int pcRelOffset = elemOffset - execPC;
 						operands[i] = new SizedMemoryOperand(

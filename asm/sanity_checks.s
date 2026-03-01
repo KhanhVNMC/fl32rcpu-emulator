@@ -1,9 +1,4 @@
-@text
-JMP _vga_entry ; since this is bare metal, there's no entry
-
-.include "test.s" once
-
-.define VGA_BASE        #MMIO_BASE + 96
+.define VGA_BASE        0xf8000000 + 0x7c00000
 
 .define VIDEO_CONTROL   #VGA_BASE + 0x00
 .define VIDEO_MODE      #VGA_BASE + 0x04
@@ -12,17 +7,13 @@ JMP _vga_entry ; since this is bare metal, there's no entry
 .define CURSOR_CONTROL  #VGA_BASE + 0x20
 .define TEXT_VRAM_BASE  #VGA_BASE + 0xF0 + 0x258000
 
+.define SOC_CTRL_BASE   0xf8000000 ; mmio base
+
 @data
 hello    .asciz "Hello"
 @text
-_vga_entry:
-    LEA     RSP, $hello[0]
-    LEA     RSP, _vga_entry
-    LDI     RSP, 0xFFFFFF
-    ; sleep
-    LDI     r8, 3000000 ; sleep for 2s
-    CALL    sleep
 
+_vga_entry:
     ; tell the screen to wake the fuck up
     LDI     RAX, #VIDEO_CONTROL
     LDI     RBX, 0b01 ; VBLANKIRQ|ENABLE
@@ -36,22 +27,28 @@ _vga_entry:
     LDI     RBX, 0b011 ; FULLBLOCK|BLINK|ENABLE
     STW     [RAX], RBX
 
+    LDI     RBX, (0 << 25) | (0 << 24) | ((15 % 16) << 8)
     ; VERY crude program, for testing only
+    LDI     RCX, #SOC_CTRL_BASE + 0xF0
     LDI     RAX, #TEXT_VRAM_BASE
-    LDI     RBX, (0 << 25) | (0 << 24) | ((15 % 16) << 8) | ('H' % 256)
-    STW     [RAX], RBX
-    
-    LDI     RAX, #TEXT_VRAM_BASE + 4
-    LDI     RBX, (0 << 25) | (0 << 24) | ((11 % 16) << 8) | ('i' % 256)
-    STW     [RAX], RBX
-
-    LDI     RAX, #TEXT_VRAM_BASE + 8
-    LDI     RBX, (0 << 25) | (0 << 24) | ((15 % 16) << 8) | ('!' % 256)
-    STW     [RAX], RBX
+    LDI     R10, 16 + 1 + 48
+    wrt:
+        LDB     R6, [RCX]
+        OR      RDX, RBX, R6
+        STW     [RAX], RDX
+        ADDI    RCX, 1
+        ADDI    RAX, 4
+        ADDI    R9, 1
+        CMP     R9, R10
+        JNE     wrt
 
     LDI     RAX, #CURSOR_X ; move the cursor to x=3 (with x0=0)
     LDI     RBX, 3
-    STW     [RAX], RBX
+    STW     [RAX], R10
+
+    LDI     RCX, #SOC_CTRL_BASE
+    LDI     RAX, 1 << 1
+    STB     [RCX], RAX
 
     SPIN:
     JMP SPIN ; prevents it from shutting down

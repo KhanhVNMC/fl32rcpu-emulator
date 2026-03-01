@@ -63,7 +63,6 @@ public class Main {
 			if (startVM) {
 				System.out.println("\n[VM] Starting FL32R-compliant CPU Emulator...");
 				FL32REmulator emu = new FL32REmulator(Calc.MB(256));
-				emu.setFrequencyHz(32_000_000); // 32MHZ cpu
 				emu.loadBootROM(Files.readAllBytes(Path.of(outputPath)));
 				emu.start(false);
 				System.out.println("\n[VM] CPU Halted! Registers Dump:");
@@ -102,6 +101,6 @@ public class Main {
 		System.err.printf("  at %s:%d:%d%n", sourcePath, line, t.column());
 		System.err.println("    | ");
 		System.err.printf (" %02d | %s\n", t.line() + 1, t.lexer().getSourceAtLine(t.line()));
-		System.err.println("    | " + "~".repeat(t.column()) + "^--- here");
+		System.err.println("    | " + "~".repeat(t.column()) + "^".repeat(t.literal().length()) + "--- here");
 	}
 }

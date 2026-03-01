@@ -36,7 +36,7 @@ public class Instruction {
 			sb.append("{meta=").append(metadata).append("}");
 		}
 		if (operands != null && operands.length > 0) {
-			sb.append(' ');
+			sb.append(" ".repeat(4 - (opcode.name().length() - 3)));
 			for (int i = 0; i < operands.length; i++) {
 				if (i > 0) sb.append(", ");
 				sb.append(operands[i]);

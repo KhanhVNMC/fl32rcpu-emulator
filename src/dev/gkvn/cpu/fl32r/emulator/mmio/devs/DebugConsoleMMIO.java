@@ -10,7 +10,7 @@ public final class DebugConsoleMMIO extends AbstractMMIODevice {
 	private static final int REG_STATUS = 0x08;
 
 	public DebugConsoleMMIO(FL32RMMIO mmio, int base) {
-		super(mmio, base, 32);
+		super(mmio, base, FL32RMMIO.MMIO_BASIC_REGION_SIZE);
 		System.out.println("======= UART CONSOLE OUTPUT =======");
 	}
 

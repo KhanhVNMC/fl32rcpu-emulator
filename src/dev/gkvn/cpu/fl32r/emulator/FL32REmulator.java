@@ -12,6 +12,7 @@ import dev.gkvn.cpu.fl32r.emulator.mmio.FL32RMMIO;
 import dev.gkvn.cpu.fl32r.emulator.mmio.devs.*;
 import dev.gkvn.cpu.utils.ByteMemorySpace;
 import dev.gkvn.cpu.fl32r.emulator.mmio.devs.DiskDriveMMIO.EmulatedVirtualDisk;
+import dev.gkvn.cpu.fl32r.emulator.mmio.devs.SoCControl.CPUID;
 
 // this CPU is BIG-ENDIAN, 32-bit processor with primitive MMU
 // FL32RCPU -> Fixed Length 32-bit RISC CPU
@@ -53,12 +54,17 @@ public class FL32REmulator implements GenericCPUEmulator {
 		if (memorySize < 256 || memorySize > RAM_WINDOW_END + 1) {
 			throw new IllegalArgumentException("Memory size must be 256 -> " + (RAM_WINDOW_END + 1) + " bytes");
 		}
-		this.setFrequencyHz(32_000_000); // 32 MHZ cpu
+		this.setFrequencyHz(128_000_000); // 32 MHZ cpu
 		this.memory = new ByteMemorySpace(memorySize);
 		this.readOnlyMemory = new ByteMemorySpace(ROM_SIZE); // 1 MB of ROM (for boot code)
 		this.mmioBus = new FL32RMMIO(this);
 		
 		// basic MMIO devices (32 bytes of registers each) test
+		this.mmioBus.register(new SoCControl(mmioBus, 0, new CPUID(
+			"EmulatedFL32RISC", 
+			(byte) 0x0,
+			"Generic FL32R Compilant Processor @ " + (getFrequencyHz() / 1_000_000) + "Mhz"
+		)));
 		this.timer = this.mmioBus.register(new HardwareTimerMMIO(mmioBus, mmioBus.allocateBasicNext()));
 		this.mmioBus.register(new DebugConsoleMMIO(mmioBus, mmioBus.allocateBasicNext()));
 		this.mmioBus.register(new DiskDriveMMIO(mmioBus, mmioBus.allocateBasicNext(), 
@@ -70,7 +76,7 @@ public class FL32REmulator implements GenericCPUEmulator {
 				"BASIC v1.0\0"
 			)
 		));
-		this.mmioBus.register(new VGAGraphicsMMIO(mmioBus, mmioBus.allocateBasicNext()));
+		this.mmioBus.register(new VGAGraphicsMMIO(mmioBus));
 	}
 	
 	public FL32RMMIO getMmioBus() {
