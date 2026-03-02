@@ -52,7 +52,8 @@ public class LineStreamProvider {
 	}
 	
 	public Path getCurrentPath() {
-		return includeStack.peek();
+		// hacky lil shit
+		return includeStack.isEmpty() ? initial.getSourcePath() : includeStack.peek();
 	}
 	
 	/**
