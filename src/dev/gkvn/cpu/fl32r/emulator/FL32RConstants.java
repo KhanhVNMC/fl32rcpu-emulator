@@ -38,6 +38,7 @@ public class FL32RConstants {
 		SHLI = 0x24, // shift left
 		SRAI = 0x25, // shift right arithmetic
 		SHRI = 0x26, // shift right logic
+		CMPI = 0x27, // compare immediate
 		
 		// STACK CONTROLS
 		PUSH = 0x40,

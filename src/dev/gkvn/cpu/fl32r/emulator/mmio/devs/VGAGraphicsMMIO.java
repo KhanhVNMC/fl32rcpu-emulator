@@ -41,6 +41,9 @@ public final class VGAGraphicsMMIO extends AbstractMMIODevice {
 	// 80 (horizontal) x 30 (vertical) for a total of 240 chars, 4 bytes each
 	public static final int TEXT_MODE_SIZE = 80 * 30 * 4;
 	public static final int RGB32_MODE_SIZE  = WIDTH * HEIGHT * 4;
+	// TEXT shit
+	public static final int GLYPH_WIDTH = 8, GLYPH_HEIGHT = 16;
+	public static final int MAX_HORIZONTAL = 80, MAX_VERTICAL = 30;
 	
 	public static final int 
 		VIDEO_CTRL_ENABLE = 1 << 0,
@@ -61,14 +64,15 @@ public final class VGAGraphicsMMIO extends AbstractMMIODevice {
 		FRAMEBUFFER_INDEX = 0x14,
 		
 		CURSOR_X = 0x18, 
-		CURSOR_Y = 0x1C, 
-		CURSOR_CONTROL = 0x20,
+		CURSOR_Y = 0x1C,
+		CURSOR_POS = 0x20,
+		CURSOR_CONTROL = 0x24,
 		
-		PALETTE_INDEX = 0x24,
-		PALETTE_DATA = 0x28,
+		PALETTE_INDEX = 0x28,
+		PALETTE_DATA = 0x2C,
 		
 		// end
-		REG_END = 0x28 + 4
+		REG_END = 0x2C + 4
 	;
 	
 	public static final int 
@@ -195,6 +199,7 @@ public final class VGAGraphicsMMIO extends AbstractMMIODevice {
 				case FRAMEBUFFER_INDEX -> framebufferIndex;
 				case CURSOR_X -> cursorX;
 				case CURSOR_Y -> cursorY;
+				case CURSOR_POS -> cursorY * MAX_HORIZONTAL + cursorX;
 				case CURSOR_CONTROL -> 
 					(cursorOn ? CURSOR_CTRL_ON : 0) |
 					(cursorBlink ? CURSOR_CTRL_BLINK : 0) | 
@@ -227,6 +232,10 @@ public final class VGAGraphicsMMIO extends AbstractMMIODevice {
 				// cursor position
 				case CURSOR_X -> cursorX = Math.max(0, Math.min(79, value));
 				case CURSOR_Y -> cursorY = Math.max(0, Math.min(29, value));
+				case CURSOR_POS -> {
+					this.cursorX = value % MAX_HORIZONTAL;
+					this.cursorY = Math.max(0, Math.min(29, value / MAX_HORIZONTAL));
+				}
 				// cursor control
 				case CURSOR_CONTROL -> {
 					cursorOn = (value & CURSOR_CTRL_ON) != 0;
@@ -274,12 +283,11 @@ public final class VGAGraphicsMMIO extends AbstractMMIODevice {
 		}
 	}
 	
-	static final int GLYPH_WIDTH = 8, GLYPH_HEIGHT = 16;
 	private void renderTextMode() {
 		int p = TEXT_MODE_BASE;
 		
-		for (int y = 0; y < 30; y++) {
-			for (int x = 0; x < 80; x++) {
+		for (int y = 0; y < MAX_VERTICAL; y++) {
+			for (int x = 0; x < MAX_HORIZONTAL; x++) {
 				// fetch char
 				int screenChar = Utils.beBytesToInt(
 					vram.get(p), 

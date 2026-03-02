@@ -29,7 +29,7 @@ _vga_entry:
 
     LDI     RBX, (0 << 25) | (0 << 24) | ((15 % 16) << 8)
     ; VERY crude program, for testing only
-    LDI     RCX, #SOC_CTRL_BASE + 0xF0
+    LDI     RCX, #SOC_CTRL_BASE + 0xF0 ; SOC_BRAND_STRING
     LDI     RAX, #TEXT_VRAM_BASE
     LDI     R10, 16 + 1 + 48
     wrt:

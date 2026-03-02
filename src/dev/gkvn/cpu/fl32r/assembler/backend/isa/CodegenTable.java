@@ -50,12 +50,14 @@ public class CodegenTable {
 		entry(SRAI,  iType(FL32RConstants.SRAI));
 		entry(SHRI,  iType(FL32RConstants.SHRI));
 		
+		entry(CMP,   rType(FL32RConstants.CMP));
+		entry(CMPI,  iType(FL32RConstants.CMPI));
+		
 		entry(PUSH,  rType(FL32RConstants.PUSH));
 		entry(POP,   rType(FL32RConstants.POP));
 		
 		entry(JMP,   jType(FL32RConstants.JMP));
 		entry(JR,    rType(FL32RConstants.JR));
-		entry(CMP,   rType(FL32RConstants.CMP));
 		entry(JEQ,   jType(FL32RConstants.JEQ));
 		entry(JNE,   jType(FL32RConstants.JNE));
 		entry(JLT,   jType(FL32RConstants.JLT));

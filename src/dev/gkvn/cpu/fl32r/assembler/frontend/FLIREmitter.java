@@ -63,14 +63,13 @@ public class FLIREmitter {
 	// internal backed data structs
 	private ConstantFolder folder;
 	private LineStreamProvider provider; 
-	private Path initialPath;
 	
 	public FLIREmitter(LineStreamProvider source) {
 		this.provider = source;
 		this.folder = new ConstantFolder(defineValues);
 		// ofc, otherwise bullfuckingshit like ".include "self" once" will
 		// cause the file to be shaded twice
-		this.includeOnceSeen.add(this.initialPath = source.getInitial().getSourcePath());
+		this.includeOnceSeen.add(source.getInitial().getSourcePath());
 	}
 		
 	public FrontendCAIR emit() throws AsmError {
@@ -188,7 +187,7 @@ public class FLIREmitter {
 		
 		// resolve the files in a very stupid way
 		String fileName = sourceTok.literal().substring(1, sourceTok.literal().length() - 1);
-		Path includePath = initialPath.getParent().resolve(fileName).normalize();
+		Path includePath = this.provider.getCurrentPath().getParent().resolve(fileName).normalize();
 		// dont make a lexer for already resolved entries, period
 		if (once && includeOnceSeen.contains(includePath)) {
 			return;

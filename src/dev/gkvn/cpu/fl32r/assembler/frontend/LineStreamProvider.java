@@ -51,6 +51,10 @@ public class LineStreamProvider {
 		return true;
 	}
 	
+	public Path getCurrentPath() {
+		return includeStack.peek();
+	}
+	
 	/**
 	 * Removes and returns the current source stack
 	 */

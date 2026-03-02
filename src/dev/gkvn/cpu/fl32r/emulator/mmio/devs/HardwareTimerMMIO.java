@@ -21,17 +21,22 @@ public final class HardwareTimerMMIO extends AbstractMMIODevice {
 		CTRL_RESET = 1 << 4 // W1C: reset counter
 	;
 		
-	private final long startTimeNs;
-	private long compare = Long.MAX_VALUE;
-	private long period = 0;
-
-	private int packedCtrl = 0;
+	// flagkeeper
+	private long startTimeNs;
+	
+	private boolean enabled = false;
+	private boolean irqEnabled = false;
 	private boolean irqPending = false;
+	
+	// period setting
+	private long deadlineUs = Long.MAX_VALUE; // us = microsec
+	private boolean periodic = false;
+	private long periodUs = 0;
 	
 	// microsecond timer
 	public HardwareTimerMMIO(FL32RMMIO mmio, int base) {
 		super(mmio, base, FL32RMMIO.MMIO_BASIC_REGION_SIZE);
-		this.startTimeNs = System.nanoTime();
+		this.resetCounter(); // doubles as an init
 	}
 
 	private long counter() {
@@ -44,8 +49,7 @@ public final class HardwareTimerMMIO extends AbstractMMIODevice {
 		return switch (offset(address)) {
 			case REG_COUNT_LO -> (int) (cnt & 0xFF_FF_FF_FFL);
 			case REG_COUNT_HI -> (int) (cnt >>> 32);
-			case REG_COMPARE -> (int) this.compare;
-			case REG_CTRL -> this.packedCtrl;
+			case REG_COMPARE -> (int) this.periodUs;
 			default -> 0;
 		};
 	}
@@ -54,8 +58,9 @@ public final class HardwareTimerMMIO extends AbstractMMIODevice {
 	public void writeWord(int address, int value) {
 		switch (offset(address)) {
 			case REG_COMPARE -> {
-				this.compare = Integer.toUnsignedLong(value);
-				this.period = compare;
+				long period = Integer.toUnsignedLong(value);
+				this.periodUs = period;
+				this.deadlineUs = counter() + period;
 			}
 			case REG_CTRL -> {
 				// W1C semantics
@@ -65,31 +70,38 @@ public final class HardwareTimerMMIO extends AbstractMMIODevice {
 				if ((value & CTRL_IRQ_ACK) != 0) {
 					this.irqPending = false;
 				}
-				// persistent control bits
-				this.packedCtrl = value & ~(CTRL_RESET | CTRL_IRQ_ACK);
+				// persistent controls
+				enabled = (value & CTRL_ENABLE) != 0;
+				irqEnabled = (value & CTRL_IRQ_ENABLE) != 0;
+				periodic = (value & CTRL_PERIODIC) != 0;
 			}
 		}
 	}
-
+	
+	// completely rewrites the shit
 	private void resetCounter() {
-		compare = Long.MAX_VALUE;
-		irqPending = false;
+		this.startTimeNs = System.nanoTime();
+		this.deadlineUs = Long.MAX_VALUE;
+		this.periodUs = 0;
+		this.irqPending = false;
+		this.enabled = false;
+		this.irqEnabled = false;
+		this.periodic = false;
 	}
-
-	public void tick() {
-		if ((this.packedCtrl & CTRL_ENABLE) == 0) {
-			return;
+	
+	// the software must acknowledges before the next IRQ can fire
+	public void irqAck() {
+		if (periodic) {
+			this.deadlineUs += periodUs;
 		}
-		long cnt = counter();
-		if (cnt >= compare && !irqPending) {
-			this.irqPending = true;
-			if ((this.packedCtrl & CTRL_IRQ_ENABLE) != 0) {
-				this.interrupt(TIMER_IRQ);
-			}
-			if ((this.packedCtrl & CTRL_PERIODIC) != 0) {
-				this.compare += period;
-				this.irqPending = false;
-			}
+		this.irqPending = false;
+	}
+	
+	public void tick() {
+		if (!enabled || irqPending) return;
+		// fire IRQ (if enabled) on the next deadline
+		if (irqEnabled && counter() > deadlineUs) {
+			this.interrupt(TIMER_IRQ);
 		}
 	}
 }

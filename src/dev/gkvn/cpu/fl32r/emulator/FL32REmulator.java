@@ -62,8 +62,8 @@ public class FL32REmulator implements GenericCPUEmulator {
 		// basic MMIO devices (32 bytes of registers each) test
 		this.mmioBus.register(new SoCControl(mmioBus, 0, new CPUID(
 			"EmulatedFL32RISC", 
-			(byte) 0x0,
-			"Generic FL32R Compilant Processor @ " + (getFrequencyHz() / 1_000_000) + "Mhz"
+			(byte) 0x00,
+			"Generic FL32R Compliant Processor @ " + (getFrequencyHz() / 1_000_000) + "Mhz"
 		)));
 		this.timer = this.mmioBus.register(new HardwareTimerMMIO(mmioBus, mmioBus.allocateBasicNext()));
 		this.mmioBus.register(new DebugConsoleMMIO(mmioBus, mmioBus.allocateBasicNext()));
@@ -473,6 +473,17 @@ public class FL32REmulator implements GenericCPUEmulator {
 					this.NFL = (result < 0);
 					this.OFL = Utils.detectAddOverflow(current, immediate, result);
 				}
+				break;
+			}
+			// COMPARE IMMEDIATE: r0 (rOp0) - immediate (19 bits lsb; signed)
+			case CMPI: {
+				int left  = readRegister(rOp0); 
+				int right = Utils.convertImm19ToInt(operand);
+				int result = left - right;
+				// set the flags
+				this.ZFL = result == 0;
+				this.NFL = (result < 0);
+				this.OFL = Utils.detectSubOverflow(left, right, result);
 				break;
 			}
 			// stack operations push(rDest)

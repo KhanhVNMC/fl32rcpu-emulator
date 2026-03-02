@@ -42,6 +42,7 @@ public enum FEOpCode {
 	POP   (1, REG),
 	
 	CMP   (1, REG, REG),
+	CMPI  (1, REG, IMM19_ABS),
 	
 	JMP   (1, IMM24_PC_REL),
 	JEQ   (1, IMM24_PC_REL),
