@@ -60,20 +60,34 @@ public class FLIREmitter {
 		DIRECTIVE_INCLUDE  = ".include", SUF_MODIFIER_ONCE = "once"
 	;
 	
+	// macro functions
+	public final static String
+		SIZEOF_FUNCTION = "sizeof",
+		LENGTH_FUNCTION = "length"
+	;
+	
 	// internal backed data structs
 	private ConstantFolder folder;
 	private LineStreamProvider provider; 
 	
 	public FLIREmitter(LineStreamProvider source) {
 		this.provider = source;
-		this.folder = new ConstantFolder(defineValues);
+		this.folder = new ConstantFolder(this);
 		// ofc, otherwise bullfuckingshit like ".include "self" once" will
 		// cause the file to be shaded twice
 		this.includeOnceSeen.add(source.getInitial().getSourcePath());
 	}
 		
 	public FrontendCAIR emit() throws AsmError {
-		this.parseLines();
+		this.parseLines(); // emit normal IR
+		
+		System.out.println("---- FIRST PASS IR DUMP ----");
+		int pc = 0x00;
+		for (Instruction instr : collectedInstructions) {
+			System.out.printf("%08X   %s\n", pc, instr.toString());
+			pc += instr.getSize();
+		}
+		System.out.println("----------------------------");
 				
 		// this will emit CONTEXT AWARE IR (CAIR) for the backend generation
 		this.resolveLabelAndVariableAddresses();
@@ -93,9 +107,9 @@ public class FLIREmitter {
 	ByteArrayOutputStream dataSectionBytes = new ByteArrayOutputStream();
 	// bookkeeping and result
 	private ParsingContext context = ParsingContext.NONE;
-	private Map<String, LabelText> labelAddresses = new HashMap<>();
-	// define values
-	private Map<String, DefineValue> defineValues = new HashMap<>();
+	public final Map<String, LabelText> labelAddresses = new HashMap<>();
+	// defined values
+	public final Map<String, DefineValue> definedValues = new HashMap<>();
 	
 	/**
 	 * Begins parsing until the provider is exhausted.
@@ -233,8 +247,8 @@ public class FLIREmitter {
 		}
 		
 		String name = nameTok.literal();
-		if (defineValues.containsKey(name)) {
-			Token definedAt = defineValues.get(name).owner();
+		if (definedValues.containsKey(name)) {
+			Token definedAt = definedValues.get(name).owner();
 			throw new AsmError(nameTok,
 				"Symbol '%s' already defined at line %d in '%s'",
 				name, definedAt.line() + 1, definedAt.lexer().getSourcePath()
@@ -244,12 +258,12 @@ public class FLIREmitter {
 		// for string def ".define string_val "hi world"
 		Token next = line.peek();
 		if (line.length() == 3 && next.type() == TokenType.STRING) {
-			this.defineValues.put(name, new DefineValue(next, next.literal()));
+			this.definedValues.put(name, new DefineValue(next, next.literal()));
 			return;
 		}
 		
 		// for numeric & shit ".define num_val 36 + 1
-		this.defineValues.put(name, Try.absorbAsm(() -> new DefineValue(
+		this.definedValues.put(name, Try.absorbAsm(() -> new DefineValue(
 			next, folder.foldExpression(line)
 		), line.peekNotNull()));
 		
@@ -258,7 +272,7 @@ public class FLIREmitter {
 		}
 	}
 	
-	public void parseUndefineValue(TokenStream line) {
+	private void parseUndefineValue(TokenStream line) {
 		line.advance(); // consume the `.define`
 		if (line.length() == 1) {
 			throw new AsmError(
@@ -279,19 +293,19 @@ public class FLIREmitter {
 		}
 		
 		String name = nameTok.literal();
-		if (!defineValues.containsKey(name)) {
+		if (!definedValues.containsKey(name)) {
 			throw new AsmError(nameTok,
 				"Cannot undefine an undefined symbol '%s'.",
 				name
 			);
 		}
-		this.defineValues.remove(name);
+		this.definedValues.remove(name);
 	}
 	
 	// DATA SECTION PARSING
-	private Map<String, DataSymbol> dataSymbols = new HashMap<>();
+	public final Map<String, DataSymbol> dataSymbols = new HashMap<>();
 	private int dataActivePointer = 0; // data section address counter
-
+	
 	private void parseDataSection(TokenStream line) {
 		if (line.length() == 1) {
 			throw new AsmError(
@@ -378,7 +392,7 @@ public class FLIREmitter {
 					String symName = strToken.literal();
 					symName = symName.substring(1, symName.length());
 					// read and match the symbol
-					DefineValue value = defineValues.get(symName);
+					DefineValue value = definedValues.get(symName);
 					if (value == null) {
 						throw new AsmError(strToken, 
 							"Undefined string symbol '%s'.",

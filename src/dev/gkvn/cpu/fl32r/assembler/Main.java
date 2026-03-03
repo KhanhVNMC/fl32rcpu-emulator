@@ -62,7 +62,8 @@ public class Main {
 			// start the emulator/vm
 			if (startVM) {
 				System.out.println("\n[VM] Starting FL32R-compliant CPU Emulator...");
-				FL32REmulator emu = new FL32REmulator(Calc.MB(256));
+				FL32REmulator emu = new FL32REmulator(Calc.MB(64));
+				emu.setFrequencyHz(128_000_000); // 32MHZ cpu
 				emu.loadBootROM(Files.readAllBytes(Path.of(outputPath)));
 				emu.start(false);
 				System.out.println("\n[VM] CPU Halted! Registers Dump:");

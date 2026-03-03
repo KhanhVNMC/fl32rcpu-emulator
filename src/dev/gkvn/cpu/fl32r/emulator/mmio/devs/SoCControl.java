@@ -66,7 +66,11 @@ public final class SoCControl extends AbstractMMIODevice {
 	
 	@Override
 	public int readWord(int address) {
-		return Byte.toUnsignedInt(readByte(address));
+		int off = offset(address);
+		if (off == REG_SOC_TOTAL_MEMORY) {
+			return (int) (getEmulator().getMemory().length() & 0xFF_FF_FF_FFL);
+		}
+		return 0;
 	}
 	
 	@Override

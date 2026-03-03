@@ -1,16 +1,19 @@
 package dev.gkvn.cpu.fl32r.assembler.frontend.utils;
 
-import java.util.Map;
-
+import dev.gkvn.cpu.fl32r.assembler.frontend.FLIREmitter;
+import dev.gkvn.cpu.fl32r.assembler.frontend.core.DataSymbol;
 import dev.gkvn.cpu.fl32r.assembler.frontend.core.DefineValue;
+import dev.gkvn.cpu.fl32r.assembler.frontend.exceptions.AsmError;
 import dev.gkvn.cpu.fl32r.assembler.frontend.exceptions.FrontendSolveError;
 import dev.gkvn.cpu.fl32r.assembler.frontend.lexer.Token;
 import dev.gkvn.cpu.fl32r.assembler.frontend.lexer.TokenType;
 
+import static dev.gkvn.cpu.fl32r.assembler.frontend.FLIREmitter.*;
+
 public class ConstantFolder {
-	private Map<String, DefineValue> context;
+	private FLIREmitter context;
 	
-	public ConstantFolder(Map<String, DefineValue> context) {
+	public ConstantFolder(FLIREmitter context) {
 		this.context = context;
 	}
 	
@@ -90,11 +93,30 @@ public class ConstantFolder {
 	}
 	
 	private int parsePrimary(TokenStream stream) throws FrontendSolveError {
-		if (context != null && stream.consumeIfMatch(TokenType.DEFINE_REF)) {
+		// macro functions for shit and giggles
+		if (stream.consumeIfMatch(TokenType.IDENTIFIER)) {
+			String macroFunc = stream.previous().literal();
+			if (macroFunc.equals(SIZEOF_FUNCTION) || macroFunc.equals(LENGTH_FUNCTION)) {
+				stream.consume(TokenType.LPAREN, "Expected '(' after macro function '" + macroFunc + "'");
+				String varName = stream.consume(
+					TokenType.VAR, "Expected a defined variable in macro function '" + macroFunc + "'"
+				).literal().substring(1);
+				DataSymbol symbol = context.dataSymbols.get(varName); // resolve the variable
+				if (symbol == null) {
+					throw new AsmError(
+						"Unknown variable: '" + varName + "'", 
+						stream.previous()
+					);
+				}
+				stream.consume(TokenType.RPAREN, "Expected ')' to close '" + macroFunc + "'");
+				return macroFunc.equals(LENGTH_FUNCTION) ? symbol.elementCount() : symbol.elementSize();
+			}
+		}
+		if (stream.consumeIfMatch(TokenType.DEFINE_REF)) {
 			String symName = stream.previous().literal();
 			symName = symName.substring(1, symName.length());
 			// read and match the symbol
-			DefineValue value = context.get(symName);
+			DefineValue value = context.definedValues.get(symName);
 			if (value == null) {
 				throw new RuntimeException("Undefined symbol '" + symName + "'.");
 			}
