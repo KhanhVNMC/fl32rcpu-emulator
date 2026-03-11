@@ -11,6 +11,7 @@ import dev.gkvn.cpu.GenericCPUEmulator;
 import dev.gkvn.cpu.fl32r.emulator.mmio.FL32RMMIO;
 import dev.gkvn.cpu.fl32r.emulator.mmio.devs.*;
 import dev.gkvn.cpu.utils.ByteMemorySpace;
+import dev.gkvn.cpu.utils.SingletonEventSource;
 import dev.gkvn.cpu.fl32r.emulator.mmio.devs.DiskDriveMMIO.EmulatedVirtualDisk;
 import dev.gkvn.cpu.fl32r.emulator.mmio.devs.SoCControl.CPUID;
 
@@ -59,7 +60,11 @@ public class FL32REmulator implements GenericCPUEmulator {
 		this.readOnlyMemory = new ByteMemorySpace(ROM_SIZE); // 1 MB of ROM (for boot code)
 		this.mmioBus = new FL32RMMIO(this);
 		
-		// basic MMIO devices (32 bytes of registers each) test
+		// create keylisteners
+		SingletonEventSource<Integer> keyDown = new SingletonEventSource<>();
+		SingletonEventSource<Integer> keyUp = new SingletonEventSource<>();
+
+		// basic MMIO devices (32 bytes of registers each)
 		this.mmioBus.register(new SoCControl(mmioBus, 0, new CPUID(
 			"EmulatedFL32RISC", 
 			(byte) 0x00,
@@ -67,6 +72,7 @@ public class FL32REmulator implements GenericCPUEmulator {
 		)));
 		this.timer = this.mmioBus.register(new HardwareTimerMMIO(mmioBus, mmioBus.allocateBasicNext()));
 		this.mmioBus.register(new DebugConsoleMMIO(mmioBus, mmioBus.allocateBasicNext()));
+		this.mmioBus.register(new PS2KeyboardMMIO(mmioBus, mmioBus.allocateBasicNext(), keyDown, keyUp));
 		this.mmioBus.register(new DiskDriveMMIO(mmioBus, mmioBus.allocateBasicNext(), 
 			new EmulatedVirtualDisk(
 				DiskDriveMMIO.manifestEVDK(1024, "harddisk.evdk"),
@@ -76,7 +82,7 @@ public class FL32REmulator implements GenericCPUEmulator {
 				"BASIC v1.0\0"
 			)
 		));
-		this.mmioBus.register(new VGAGraphicsMMIO(mmioBus));
+		this.mmioBus.register(new VGAGraphicsMMIO(mmioBus, keyDown, keyUp));
 	}
 	
 	public FL32RMMIO getMmioBus() {

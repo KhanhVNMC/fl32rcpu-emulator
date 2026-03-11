@@ -6,10 +6,16 @@ import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.event.FocusAdapter;
+import java.awt.event.FocusEvent;
+import java.awt.event.KeyAdapter;
+import java.awt.event.KeyEvent;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashSet;
+import java.util.Set;
 
 import javax.swing.JFrame;
 import javax.swing.JPanel;
@@ -20,6 +26,7 @@ import dev.gkvn.cpu.fl32r.emulator.Utils;
 import dev.gkvn.cpu.fl32r.emulator.mmio.AbstractMMIODevice;
 import dev.gkvn.cpu.fl32r.emulator.mmio.FL32RMMIO;
 import dev.gkvn.cpu.utils.ByteMemorySpace;
+import dev.gkvn.cpu.utils.SingletonEventSource;
 
 public final class VGAGraphicsMMIO extends AbstractMMIODevice {	
 	public static final int WIDTH = 640, HEIGHT = 480;
@@ -37,7 +44,7 @@ public final class VGAGraphicsMMIO extends AbstractMMIODevice {
 	}
 	
 	// VGA info
-	public static final int VBLANK_IRQ     = 0x02;
+	public static final int VBLANK_IRQ     = 0x03;
 	// 80 (horizontal) x 30 (vertical) for a total of 240 chars, 4 bytes each
 	public static final int TEXT_MODE_SIZE = 80 * 30 * 4;
 	public static final int RGB32_MODE_SIZE  = WIDTH * HEIGHT * 4;
@@ -115,7 +122,10 @@ public final class VGAGraphicsMMIO extends AbstractMMIODevice {
 	private volatile boolean blinkOn = true;
 	
 	public static final int MEMORY_MAP_SIZE = 4 * 1024 * 1024;
-	public VGAGraphicsMMIO(FL32RMMIO mmio) {
+	public VGAGraphicsMMIO(FL32RMMIO mmio,
+			SingletonEventSource<Integer> keyDown,
+			SingletonEventSource<Integer> keyUp
+		) {
 		super(mmio, FL32RMMIO.MMIO_REGION_SIZE - MEMORY_MAP_SIZE, MEMORY_MAP_SIZE);	
 		// default palette
 		System.arraycopy(FL32RConstants.VGA_STD_PALETTE, 0, palette, 0, 256);
@@ -139,11 +149,41 @@ public final class VGAGraphicsMMIO extends AbstractMMIODevice {
 				g2.drawImage(image, 0, 0, w, h, null);
 			}
 		};
-		panel.setPreferredSize(new Dimension(640, 480));
+		panel.setPreferredSize(new Dimension(WIDTH, HEIGHT));
+		
+		// KEYBOARD HANDLING
+		Set<Integer> pressedKeys = new HashSet<>();
+		panel.addKeyListener(new KeyAdapter() {			
+			@Override
+			public void keyPressed(KeyEvent e) {
+				int code = e.getKeyCode(); // ARR keypresses fix
+				if (!pressedKeys.contains(code)) {
+					pressedKeys.add(code);
+					keyDown.dispatch(code);
+				}
+			}
+			@Override
+			public void keyReleased(KeyEvent e) {
+				int code = e.getKeyCode();
+				pressedKeys.remove(code);
+				keyUp.dispatch(code);
+			}
+		});
+		panel.addFocusListener(new FocusAdapter() { // edge case, this is very dumb
+			@Override
+			public void focusLost(FocusEvent e) {
+				for (int key : pressedKeys) {
+					keyUp.dispatch(key);
+				}
+				pressedKeys.clear();
+			}
+		});
+		// END OF KEYBOARD HANDLING
 		frame.add(panel);
 		frame.pack();
 		frame.setResizable(true);
 		frame.setVisible(true);
+		panel.requestFocusInWindow();
 		Thread renderThread = new Thread(() -> {
 			final long frameTimeNs = 16_666_667L; // 60hz
 			final long vblankTimeNs = 1_000_000L; // 1ms
