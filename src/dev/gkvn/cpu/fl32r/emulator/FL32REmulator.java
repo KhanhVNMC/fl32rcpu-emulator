@@ -364,7 +364,7 @@ public class FL32REmulator implements GenericCPUEmulator {
 			// load an immediate to the lower 16 bits of a register
 			case LLI: {
 				int immediate = (operand >> 3) & 0xFFFF;
-				writeRegister(rDest, immediate);
+				writeRegister(rDest, (HI(readRegister(rDest)) << 16) | immediate);
 				break;
 			}
 			// LOAD convention: LOAD A, B, OFFSET <=> READ B + OFFSET STORE TO A
@@ -920,5 +920,13 @@ public class FL32REmulator implements GenericCPUEmulator {
 	
 	private long uinttl(int val) {
 		return Integer.toUnsignedLong(val);
+	}
+	
+	static int HI(int i) {
+		return i >>> 16;
+	}
+	
+	static int LO(int i) {
+		return i & 0xFFFF;
 	}
 }

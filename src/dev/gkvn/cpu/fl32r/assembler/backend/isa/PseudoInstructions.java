@@ -29,7 +29,7 @@ public class PseudoInstructions {
 				be.emit(NO(FL32RConstants.NOP)); // cheaper
 				return;
 			}
-			be.emit(I(FL32RConstants.ORI, reg, low));
+			be.emit(U(FL32RConstants.LLI, reg, low));
 		};
 	}
 	
